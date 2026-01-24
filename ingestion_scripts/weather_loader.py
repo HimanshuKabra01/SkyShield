@@ -2,20 +2,23 @@ import requests
 import psycopg2
 import time
 from datetime import datetime
-DB_PARAMS = {
-    "dbname": "skyshield",
-    "user": "postgres",
-    "password": "Hkabra@2006", 
-    "host": "localhost",
-    "port": "5432"
-}
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def get_db_connection():
-    try:
-        return psycopg2.connect(**DB_PARAMS)
-    except Exception as e:
-        print(f"❌ DB Connection Error: {e}")
-        return None
+  DATABASE_URL = os.environ.get('DATABASE_URL')
+  if DATABASE_URL:
+    return psycopg2.connect(DATABASE_URL)
+  
+  return psycopg2.connect(
+    dbname="skyshield",
+    user="postgres",
+    password="Hkabra@2006",
+    host="localhost",
+    port="5432"
+  )
 
 def update_weather():
     print("🌤️ Starting Holistic Weather Loader...")

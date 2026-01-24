@@ -1,17 +1,25 @@
 import ee
 import psycopg2
 from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
 
-# --- CONFIGURATION ---
-GOOGLE_CLOUD_PROJECT = "api-contri" 
-DB_PARAMS = {
-    "dbname": "skyshield", "user": "postgres", "password": "Hkabra@2006",
-    "host": "localhost", "port": "5432"
-}
+load_dotenv()
 
 def get_db_connection():
-    try: return psycopg2.connect(**DB_PARAMS)
-    except Exception as e: print(f"❌ DB Connection Error: {e}"); return None
+  DATABASE_URL = os.environ.get('DATABASE_URL')
+  if DATABASE_URL:
+    return psycopg2.connect(DATABASE_URL)
+
+  return psycopg2.connect(
+    dbname="skyshield",
+    user="postgres",
+    password="Hkabra@2006",
+    host="localhost",
+    port="5432"
+  )
+
+GOOGLE_CLOUD_PROJECT = "api-contri" 
 
 def fetch_satellite_data():
     try:

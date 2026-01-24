@@ -2,15 +2,23 @@ import requests
 import psycopg2
 import random
 from datetime import datetime
+import os
+from dotenv import load_dotenv
 
-DB_PARAMS = {
-  "dbname": "skyshield", "user": "postgres", "password": "Hkabra@2006",
-  "host": "localhost", "port": "5432"
-}
+load_dotenv()
 
 def get_db_connection():
-  try: return psycopg2.connect(**DB_PARAMS)
-  except: return None
+  DATABASE_URL = os.environ.get('DATABASE_URL')
+  if DATABASE_URL:
+    return psycopg2.connect(DATABASE_URL)
+  
+  return psycopg2.connect(
+    dbname="skyshield",
+    user="postgres",
+    password="Hkabra@2006",
+    host="localhost",
+    port="5432"
+  )
 
 def generate_mock_data(station_id):
   """Generates realistic Delhi pollution data"""

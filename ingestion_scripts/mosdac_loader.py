@@ -5,21 +5,24 @@ import glob
 import os
 from datetime import datetime
 from scipy.spatial import cKDTree
+from dotenv import load_dotenv
 
-DB_CONFIG = {
-    "dbname": "skyshield",
-    "user": "postgres",
-    "password": "Hkabra@2006",
-    "host": "localhost"
-}
-DATA_FOLDER = "satellite_data/"
+load_dotenv()
 
 def get_db_connection():
-    try:
-        return psycopg2.connect(**DB_CONFIG)
-    except Exception as e:
-        print(f"Database connection failed: {e}")
-        return None
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    if DATABASE_URL:
+        return psycopg2.connect(DATABASE_URL)
+    
+    return psycopg2.connect(
+        dbname="skyshield",
+        user="postgres",
+        password="Hkabra@2006",
+        host="localhost",
+        port="5432"
+    )
+
+DATA_FOLDER = "satellite_data/"
 
 def get_dataset_key(f, possible_keys):
     """Helper to find a key that exists in the H5 file (case-insensitive check)"""

@@ -1,26 +1,28 @@
+import os
+from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
 import psycopg2
 
+load_dotenv()
+
 app = Flask(__name__)
 CORS(app)
 
-DB_PARAMS = {
-    "dbname": "skyshield",
-    "user": "postgres",
-    "password": "Hkabra@2006",
-    "host": "localhost",
-    "port": "5432"
-}
-
 def get_db_connection():
-    try:
-        return psycopg2.connect(**DB_PARAMS)
-    except Exception as e:
-        print(f"Error connecting to DB: {e}")
-        return None
-
-# --- ROUTE 1: Holistic Station Data (Point 1) ---
+  DATABASE_URL = os.environ.get('DATABASE_URL') 
+  
+  if DATABASE_URL:
+    return psycopg2.connect(DATABASE_URL)
+  else:
+    return psycopg2.connect(
+      dbname="skyshield",
+      user="postgres",
+      password="Hkabra@2006", 
+      host="localhost",
+      port="5432"
+    )
+  
 @app.route('/api/stations', methods=['GET'])
 def get_stations():
     conn = get_db_connection()
@@ -68,7 +70,6 @@ def get_stations():
         })
     return jsonify(stations)
 
-# --- ROUTE 2: Predictive Forecasts (Point 2) ---
 @app.route('/api/predictions/<station_id>', methods=['GET'])
 def get_predictions(station_id):
     conn = get_db_connection()
@@ -77,7 +78,6 @@ def get_predictions(station_id):
         
     cur = conn.cursor()
     
-    # Fetch future predictions sorted by time
     cur.execute("""
         SELECT forecast_timestamp, predicted_pm25 
         FROM predictions 
@@ -90,7 +90,6 @@ def get_predictions(station_id):
     
     data = []
     for row in rows:
-        # Format: "14:00" for X-Axis, Value for Y-Axis
         data.append({
             "time": row[0].strftime("%H:%M"), 
             "value": round(row[1], 1)
