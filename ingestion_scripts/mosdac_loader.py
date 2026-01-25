@@ -23,10 +23,10 @@ def get_db_connection():
 def process_mosdac_data():
     files = glob.glob(os.path.join(DATA_FOLDER, "*.h5"))
     if not files:
-        print(f"⚠️ No MOSDAC .h5 files found in '{DATA_FOLDER}'. Skipping.")
+        print(f"No MOSDAC .h5 files found in '{DATA_FOLDER}'. Skipping.")
         return
 
-    print(f"📂 Found {len(files)} H5 files. Processing...")
+    print(f"Found {len(files)} H5 files. Processing...")
     
     conn = get_db_connection()
     if not conn: return
@@ -35,7 +35,6 @@ def process_mosdac_data():
     cur.execute("SELECT station_id, latitude, longitude FROM stations")
     stations = cur.fetchall()
     station_ids = [s[0] for s in stations]
-    # Filter valid coords
     valid_stations = [s for s in stations if s[1] and s[2]]
     station_coords = np.array([[float(s[1]), float(s[2])] for s in valid_stations])
     valid_ids = [s[0] for s in valid_stations]
@@ -48,23 +47,18 @@ def process_mosdac_data():
     for file_path in files:
         try:
             with h5py.File(file_path, 'r') as f:
-                # Simplistic Key Search
                 keys = list(f.keys())
                 data_key = next((k for k in keys if "AOD" in k or "FOG" in k), None)
                 
                 if not data_key: continue
                 
-                # Mock Processing for structure (Real MOSDAC needs complex grid mapping)
-                # Here we just acknowledge the file was read for the demo
                 print(f"   -> Read {os.path.basename(file_path)} ({data_key})")
-                
-                # In a real scenario, you map the grid here. 
-                # For now, we rely on Sentinel for satellite data.
+
         except Exception as e:
             print(f"Error reading {file_path}: {e}")
 
     conn.close()
-    print("✅ MOSDAC processing check complete.")
+    print("MOSDAC processing check complete.")
 
 if __name__ == "__main__":
     process_mosdac_data()

@@ -32,8 +32,6 @@ interface Station {
 
 const MAP_CENTER: [number, number] = [28.6139, 77.209]
 
-/* ---------------- HELPERS ---------------- */
-
 const getSourceIcon = (source: string) => {
   if (source?.includes('Traffic')) return <Car size={14} className="text-orange-300" />
   if (source?.includes('Industrial')) return <Factory size={14} className="text-purple-300" />
@@ -74,8 +72,6 @@ const GlowMarker = ({ position, color, radius }: { position: [number, number], c
     />
   </>
 )
-
-/* ---------------- COMPONENT ---------------- */
 
 const StationMap: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([])
@@ -123,8 +119,6 @@ const StationMap: React.FC = () => {
                 pathOptions={{ color: 'transparent', fillColor: 'transparent' }}
               >
                 <Popup>
-
-                  {/* GLASS CARD */}
                   <div className="
                     w-[300px]
                     rounded-lg
@@ -136,14 +130,12 @@ const StationMap: React.FC = () => {
                     p-3
                   ">
 
-                    {/* HEADER */}
                     <div className="flex justify-between mb-2">
                       <h3 className="text-xs uppercase tracking-[0.3em] text-zinc-300 font-semibold">
                         {s.name}
                       </h3>
                     </div>
 
-                    {/* AQI */}
                     <div className="flex justify-between items-end border-b border-white/10 pb-3 mb-3">
                       <div>
                         <p className="text-4xl font-light">{s.aqi}</p>
@@ -160,7 +152,6 @@ const StationMap: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* HEALTH */}
                     <div className={`mb-3 rounded-md px-3 py-2 flex gap-3 border ${
                       s.aqi > 200
                         ? 'bg-red-500/10 border-red-500/30'
@@ -172,7 +163,6 @@ const StationMap: React.FC = () => {
                       </p>
                     </div>
 
-                    {/* METRICS */}
                     <div className="grid grid-cols-2 gap-2 mb-3">
                       <div className="rounded-md bg-zinc-800/60 border border-white/10 px-2.5 py-2">
                         <p className="text-[10px] uppercase tracking-widest text-zinc-400">PM2.5</p>
@@ -189,7 +179,6 @@ const StationMap: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* WEATHER */}
                     <div className="flex justify-between rounded-md bg-zinc-800/50 border border-white/10 px-2.5 py-2 text-[11px] text-zinc-300">
                       <div className="flex items-center gap-2">
                         <Thermometer size={12} /> {temp || '--'}°C
@@ -199,7 +188,6 @@ const StationMap: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* INVERSION */}
                     {pbl !== null && pbl < 300 && (
                       <div className="mt-3 flex justify-center gap-2 text-red-400 text-[10px] uppercase tracking-widest">
                         <AlertTriangle size={12} />

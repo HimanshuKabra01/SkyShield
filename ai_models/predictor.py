@@ -22,7 +22,6 @@ def get_db_connection():
       port="5432"
     )
 
-# --- 🚀 FEATURE: Pollution Source Fingerprinting ---
 def analyze_source(pm25, no2, so2):
     """
     Determines the likely root cause of pollution by analyzing 
@@ -30,35 +29,32 @@ def analyze_source(pm25, no2, so2):
     """
     if not pm25 or float(pm25) == 0: return "Unknown"
     
-    # Safe conversion to floats
     pm25_val = float(pm25)
     no2_val = float(no2) if no2 is not None else 0.0
     so2_val = float(so2) if so2 is not None else 0.0
 
-    # Ratios (Calibrated for Urban India)
     no2_ratio = no2_val / pm25_val
     so2_ratio = so2_val / pm25_val
     
     if so2_ratio > 0.15: 
-        return "🏭 Industrial Plume"  # High Sulfur = Coal/Factory
+        return "Industrial Plume"
     if no2_ratio > 0.35: 
-        return "🚗 Vehicular Traffic" # High Nitrogen = Diesel/Petrol
+        return "Vehicular Traffic"
     if pm25_val > 150 and no2_ratio < 0.2: 
-        return "🌫️ Dust / Biomass"    # High PM, Low Gas = Dust/Crop Burning
+        return "Dust / Biomass"
     
-    return "🏙️ Urban Mix"            # Standard City Smog
+    return "Urban Mix"
 
-# --- 🚀 FEATURE: Personalized Health Advice ---
 def get_health_advice(aqi):
     if not aqi: return "No Data"
     aqi_val = float(aqi)
     
-    if aqi_val > 400: return "⛔ HAZARDOUS: Avoid ALL outdoor exertion. Windows shut."
-    if aqi_val > 300: return "⚠️ SEVERE: Healthy people limit outdoor activity."
-    if aqi_val > 200: return "😷 VERY POOR: Wear N95 mask. Sensitive groups stay inside."
-    if aqi_val > 100: return "✋ POOR: Breathing discomfort for sensitive people."
-    if aqi_val > 50:  return "😐 MODERATE: Unusually sensitive people should reduce exertion."
-    return "✅ GOOD: Air quality is satisfactory. Enjoy the outdoors!"
+    if aqi_val > 400: return "HAZARDOUS: Avoid ALL outdoor exertion. Windows shut."
+    if aqi_val > 300: return "SEVERE: Healthy people limit outdoor activity."
+    if aqi_val > 200: return "VERY POOR: Wear N95 mask. Sensitive groups stay inside."
+    if aqi_val > 100: return "POOR: Breathing discomfort for sensitive people."
+    if aqi_val > 50:  return "MODERATE: Unusually sensitive people should reduce exertion."
+    return "GOOD: Air quality is satisfactory. Enjoy the outdoors!"
 
 @app.route('/api/stations', methods=['GET'])
 def get_stations():
@@ -66,7 +62,6 @@ def get_stations():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Fetch Latest Data for All Stations
         query = """
             SELECT 
                 s.station_id, s.name, s.latitude, s.longitude,
@@ -88,13 +83,11 @@ def get_stations():
 
         stations = []
         for row in rows:
-            # Extract raw values
             pm25 = row[4]
             aqi = row[6]
             no2 = row[7]
             so2 = row[8]
             
-            # Run AI Analysis
             source = analyze_source(pm25, no2, so2)
             advice = get_health_advice(aqi)
 
@@ -115,7 +108,6 @@ def get_stations():
                 "pbl_height": row[13],
                 "timestamp": row[14],
                 
-                # New "Standout" Fields
                 "likely_source": source,
                 "health_advice": advice
             })
@@ -144,7 +136,7 @@ def get_predictions(station_id):
         for row in rows:
             data.append({
                 "time": row[0].strftime("%H:%M"), 
-                "value": round(float(row[1]), 1) # Ensure float
+                "value": round(float(row[1]), 1)
             })
             
         return jsonify(data)

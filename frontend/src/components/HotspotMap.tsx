@@ -10,8 +10,6 @@ import "leaflet/dist/leaflet.css";
 import api from "../services/api";
 import { Flame, MapPin } from "lucide-react";
 
-/* ---------------- TYPES ---------------- */
-
 interface Station {
   station_id: string;
   name: string;
@@ -22,8 +20,6 @@ interface Station {
   wind_speed_10m: number;
   wind_dir: number;
 }
-
-/* ---------------- HOTSPOT MARKER ---------------- */
 
 const PulsingHotspot = ({
   lat,
@@ -38,7 +34,6 @@ const PulsingHotspot = ({
 
   return (
     <>
-      {/* Outer Glow */}
       <CircleMarker
         center={[lat, lon]}
         radius={radius * 1.7}
@@ -49,7 +44,6 @@ const PulsingHotspot = ({
         }}
       />
 
-      {/* Core */}
       <CircleMarker
         center={[lat, lon]}
         radius={radius}
@@ -73,8 +67,6 @@ const PulsingHotspot = ({
   );
 };
 
-/* ---------------- AUTO FIT ---------------- */
-
 const AutoBounds = ({ stations }: { stations: Station[] }) => {
   const map = useMap();
 
@@ -90,8 +82,6 @@ const AutoBounds = ({ stations }: { stations: Station[] }) => {
 
   return null;
 };
-
-/* ---------------- MAIN COMPONENT ---------------- */
 
 const HotspotMap: React.FC = () => {
   const [hotspots, setHotspots] = useState<Station[]>([]);
@@ -122,12 +112,7 @@ const HotspotMap: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden flex">
-
-      {/* ---------------- MAP ---------------- */}
-
       <div className="flex-1 relative">
-
-        {/* Vignette */}
         <div
           className="pointer-events-none absolute inset-0 z-[200]
           bg-[radial-gradient(circle_at_center,transparent_45%,rgba(0,0,0,0.75))]"
@@ -156,8 +141,6 @@ const HotspotMap: React.FC = () => {
         </MapContainer>
       </div>
 
-      {/* ---------------- SIDE PANEL ---------------- */}
-
       <div
         className="absolute right-5 top-20 bottom-5 z-[500]
         w-[21rem]
@@ -167,7 +150,6 @@ const HotspotMap: React.FC = () => {
         shadow-[0_30px_90px_rgba(0,0,0,0.9)]
         flex flex-col overflow-hidden"
       >
-        {/* Header */}
         <div className="px-5 py-4 border-b border-white/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-red-400">
@@ -183,7 +165,6 @@ const HotspotMap: React.FC = () => {
           </p>
         </div>
 
-        {/* List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {loading ? (
             <div className="p-6 text-center text-xs text-zinc-500">
@@ -230,7 +211,6 @@ const HotspotMap: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Severity Bar */}
                 <div className="mt-3 h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-red-600 to-orange-500"

@@ -15,15 +15,14 @@ def get_db_connection():
         host="localhost", port="5432"
     )
 
-GOOGLE_CLOUD_PROJECT = "api-contri"  # Ensure this matches your GEE Project ID
+GOOGLE_CLOUD_PROJECT = "api-contri"
 
 def fetch_satellite_data():
     try:
-        print("🌍 Connecting to Google Earth Engine...")
+        print("Connecting to Google Earth Engine...")
         ee.Initialize(project=GOOGLE_CLOUD_PROJECT)
     except Exception as e:
-        print(f"❌ Auth Error: {e}")
-        print("💡 Tip: Run 'earthengine authenticate' in terminal first.")
+        print(f"Auth Error: {e}")
         return
 
     conn = get_db_connection()
@@ -33,17 +32,15 @@ def fetch_satellite_data():
     cur.execute("SELECT station_id, latitude, longitude FROM stations")
     stations = cur.fetchall()
 
-    # Look back 7 days to ensure we find a cloud-free pass
     end_date = datetime.now()
     start_date = end_date - timedelta(days=7)
 
-    print("🛰️  Processing Sentinel-5P Mosaic (7-Day Aggregate)...")
+    print("Processing Sentinel-5P Mosaic (7-Day Aggregate)...")
     
-    # Create a cleaner cloud-free mosaic using the mean of the last week
     no2_img = (ee.ImageCollection('COPERNICUS/S5P/NRTI/L3_NO2')
                 .select('tropospheric_NO2_column_number_density')
                 .filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-                .mean()) # KEY FIX: Use Mean instead of First
+                .mean())
 
     so2_img = (ee.ImageCollection('COPERNICUS/S5P/NRTI/L3_SO2')
                 .select('SO2_column_number_density')
@@ -54,15 +51,14 @@ def fetch_satellite_data():
 
     for station in stations:
         s_id, lat, lon = station
-        
-        # KEY FIX: Use a buffer (radius) to find data even if the exact pixel is null
-        point = ee.Geometry.Point([float(lon), float(lat)]).buffer(2000) # 2km radius
+
+        point = ee.Geometry.Point([float(lon), float(lat)]).buffer(2000)
         
         no2_val = 0.0
         try:
             data = no2_img.reduceRegion(reducer=ee.Reducer.mean(), geometry=point, scale=1113).getInfo()
             val = data.get('tropospheric_NO2_column_number_density')
-            if val: no2_val = val * 1000000 # Convert to µmol/m²
+            if val: no2_val = val * 1000000 
         except: pass
 
         so2_val = 0.0
@@ -83,7 +79,7 @@ def fetch_satellite_data():
 
     conn.commit()
     conn.close()
-    print(f"🚀 Satellite Data Fused for {updated_count} stations.")
+    print(f"Satellite Data Fused for {updated_count} stations.")
 
 if __name__ == "__main__":
     fetch_satellite_data()

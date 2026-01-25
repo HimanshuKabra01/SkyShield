@@ -16,24 +16,20 @@ def get_db_connection():
         host="localhost", port="5432"
     )
 
-def update_weather():
-    print("🌤️ Starting Weather Loader...")
-    
+def update_weather():    
     conn = get_db_connection()
     if not conn: return
     cur = conn.cursor()
 
-    # Get only the stations we discovered in Delhi
     cur.execute("SELECT station_id, latitude, longitude FROM stations")
     stations = cur.fetchall()
-    print(f"📍 Syncing weather for {len(stations)} stations...")
+    print(f"Syncing weather for {len(stations)} stations...")
 
     count = 0
     
     for station in stations:
         s_id, lat, lon = station
 
-        # ⚠️ Crucial: 0.2s delay to respect API limits
         time.sleep(0.2) 
 
         url = (
@@ -53,7 +49,6 @@ def update_weather():
                 wind_80m = data["current"]["wind_speed_80m"]
                 pbl_height = data["hourly"]["boundary_layer_height"][0] if "hourly" in data else None
 
-                # Update the existing record created by the CPCB loader
                 query = """
                     UPDATE measurements 
                     SET temp_c = %s, 
@@ -70,11 +65,11 @@ def update_weather():
                 count += 1
                 
         except Exception as e:
-            print(f"⚠️ Weather Error {s_id}: {e}")
+            print(f"Weather Error {s_id}: {e}")
 
     conn.commit()
     conn.close()
-    print(f"✅ Weather synced for {count} stations.")
+    print(f"Weather synced for {count} stations.")
 
 if __name__ == "__main__":
     update_weather()

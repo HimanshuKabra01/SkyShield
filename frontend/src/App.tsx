@@ -16,7 +16,6 @@ interface Station {
 }
 
 const App: React.FC = () => {
-  // --- STATE ---
   const [activeTab, setActiveTab] = useState('holistic');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
@@ -24,9 +23,7 @@ const App: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
 
-  // --- EFFECTS ---
   useEffect(() => {
-    // Initial Data Load
     api.get('/stations')
       .then(res => {
         setStations(res.data);
@@ -34,8 +31,6 @@ const App: React.FC = () => {
       })
       .catch(err => console.error("Error loading stations:", err));
   }, []);
-
-  // Auto-show dashboard when logging in
   useEffect(() => {
     if (isLoggedIn) setShowDashboard(true);
   }, [isLoggedIn]);
@@ -54,22 +49,13 @@ const App: React.FC = () => {
       />
       
       <main className="relative h-full w-full">
-        
-        {/* --- 🛡️ PERSONALIZED DASHBOARD OVERLAY --- */}
-        {/* FIX: Changed to 'fixed inset-0 z-[3000]' to appear ABOVE the header for a clean modal look */}
         {isLoggedIn && showDashboard && selectedStation && (
           <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
-             
-             {/* Backdrop */}
              <div 
                className="absolute inset-0 bg-black/60 backdrop-blur-md" 
                onClick={() => setShowDashboard(false)} 
              />
-
-             {/* Dashboard Container */}
              <div className="relative w-full max-w-6xl max-h-full flex flex-col z-10 pointer-events-none">
-                
-                {/* Close/Minimize Button */}
                 <div className="flex justify-end mb-4 pointer-events-auto">
                   <button 
                     onClick={() => setShowDashboard(false)}
@@ -79,16 +65,12 @@ const App: React.FC = () => {
                     <X size={14} className="group-hover:rotate-90 transition-transform" />
                   </button>
                 </div>
-
-                {/* The Actual Component (Enable pointer events) */}
                 <div className="pointer-events-auto overflow-hidden rounded-3xl shadow-2xl shadow-black/50">
                    <PersonalizedDashboard stationId={selectedStation.station_id} />
                 </div>
              </div>
           </div>
         )}
-        
-        {/* Floating Trigger (Visible when logged in but dashboard is minimized) */}
         {isLoggedIn && !showDashboard && (
            <button 
              onClick={() => setShowDashboard(true)}
@@ -101,19 +83,12 @@ const App: React.FC = () => {
            </button>
         )}
 
-
-        {/* --- TAB CONTENT --- */}
-
-        {/* 1. HOLISTIC MAP (Fills container) */}
         <div className={`absolute inset-0 transition-opacity duration-500 ${activeTab === 'holistic' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
            <StationMap />
         </div>
         
-        {/* 2. PREDICTIVE PANEL */}
         {activeTab === 'predictive' && (
           <div className="relative z-20 h-full w-full pt-24 px-6 pb-6 grid grid-cols-1 md:grid-cols-12 gap-6">
-            
-            {/* Sidebar List - Refined Glassy UI */}
             <div className="col-span-1 md:col-span-3 h-full overflow-hidden rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md shadow-xl flex flex-col">
               <div className="p-5 border-b border-white/5 bg-white/5">
                 <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Select Station</h2>
@@ -141,8 +116,7 @@ const App: React.FC = () => {
                 ))}
               </div>
             </div>
-            
-            {/* Main Chart Area */}
+      
             <div className="col-span-1 md:col-span-9 h-full min-h-0">
               {selectedStation ? (
                 <PredictivePanel stationId={selectedStation.station_id} stationName={selectedStation.name} />
@@ -154,8 +128,7 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* 3. HOTSPOT MAP (Fills container) */}
+        
         <div className={`absolute inset-0 transition-opacity duration-500 ${activeTab === 'hotspots' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
            <HotspotMap />
         </div>

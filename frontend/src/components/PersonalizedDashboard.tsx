@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { Wind, Activity, AlertTriangle, Home, User, Settings } from 'lucide-react'
 import api from '../services/api'
 
-/* ---------------- TYPES ---------------- */
-
 interface ForecastPoint {
   time: string
   risk_score: number
@@ -38,8 +36,6 @@ interface DashboardData {
 interface Props {
   stationId: string
 }
-
-/* ---------------- COMPONENT ---------------- */
 
 const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
   const [data, setData] = useState<DashboardData | null>(null)
@@ -103,9 +99,6 @@ const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
   return (
 
     <div className="glass-panel text-white max-h-[80vh] overflow-y-auto">
-
-      {/* ================= HEADER ================= */}
-
       <div className={`relative overflow-hidden p-8 ${
         isHighRisk ? 'bg-red-500/10' : 'bg-emerald-500/10'
       }`}>
@@ -136,27 +129,15 @@ const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
               Exposure Score
             </p>
           </div>
-
         </div>
-
-        {/* Glow */}
         <div className={`absolute -top-20 -right-20 w-72 h-72 rounded-full blur-3xl opacity-30
           ${isHighRisk ? 'bg-red-500' : 'bg-emerald-500'}
         `} />
-
       </div>
 
-      {/* ================= BODY ================= */}
-
       <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-        {/* ---------- LEFT ---------- */}
-
         <div className="lg:col-span-4 space-y-6">
-
-          {/* HEALTH FACTORS */}
           <div className="glass-panel p-5">
-
             <div className="flex justify-between mb-4">
               <h3 className="flex items-center gap-2 text-zinc-300 font-semibold">
                 <Settings size={15} /> HEALTH FACTORS
@@ -200,14 +181,10 @@ const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
                   />
                 </label>
               ))}
-
             </div>
-
           </div>
 
-          {/* FORECAST */}
           <div className="glass-panel p-5">
-
             <h3 className="flex items-center gap-2 mb-4 text-zinc-300 font-semibold">
               <Activity size={15} /> 12H RISK FORECAST
             </h3>
@@ -215,9 +192,7 @@ const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
             <div className="space-y-3">
               {forecast.slice(0, 5).map((p, i) => (
                 <div key={i} className="flex items-center gap-3 text-xs">
-
                   <span className="w-10 text-zinc-500">{p.time}</span>
-
                   <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
                     <div
                       className={`h-full ${
@@ -232,27 +207,19 @@ const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
                   }`}>
                     {p.risk_score}
                   </span>
-
                 </div>
               ))}
             </div>
-
           </div>
-
         </div>
-
-        {/* ---------- RIGHT ---------- */}
 
         <div className="lg:col-span-8 grid gap-4">
 
           {activities.map((a, i) => (
 
             <div key={i} className="glass-panel p-5 hover:bg-white/5 transition">
-
               <div className="flex justify-between mb-2">
-
                 <div className="flex items-center gap-3">
-
                   <div
                     className="p-2 rounded-lg"
                     style={{ backgroundColor: `${a.color}33`, color: a.color }}
@@ -265,7 +232,6 @@ const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
                   <h4 className="text-lg font-semibold text-zinc-200">
                     {a.name}
                   </h4>
-
                 </div>
 
                 <span
@@ -274,7 +240,6 @@ const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
                 >
                   {a.status}
                 </span>
-
               </div>
 
               <p className="text-sm text-zinc-400 leading-relaxed ml-12">
@@ -282,24 +247,17 @@ const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
               </p>
 
             </div>
-
           ))}
 
-          {/* DISCLAIMER */}
           <div className="glass-panel p-4 flex gap-3 items-start">
-
             <AlertTriangle size={16} className="text-blue-400 mt-0.5" />
 
             <p className="text-[11px] text-blue-300">
               AI-generated health guidance. Always consult a medical professional.
             </p>
-
           </div>
-
         </div>
-
       </div>
-
     </div>
   )
 }

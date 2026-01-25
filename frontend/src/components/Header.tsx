@@ -17,10 +17,8 @@ const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, isLoggedIn, on
 
   return (
     <header className="fixed top-0 left-0 right-0 z-[2000] bg-gradient-to-b from-black/70 to-black/40 backdrop-blur-2xl px-6 py-4">
-      {/* Added justify-between to push Brand left and Login right */}
       <div className="relative mx-auto flex max-w-[1400px] items-center justify-between">
 
-        {/* 1. Brand (Left) */}
         <div className="flex items-center">
           <div>
             <h1 className="text-[13px] font-semibold tracking-[0.18em] text-white">
@@ -32,7 +30,6 @@ const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, isLoggedIn, on
           </div>
         </div>
 
-        {/* 2. Navigation (Absolute Center) */}
         <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-white/5 p-1 ring-1 ring-white/10 shadow-[0_0_30px_rgba(255,255,255,0.05)]">
           {navItems.map(item => (
             <button
@@ -54,8 +51,6 @@ const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, isLoggedIn, on
           ))}
         </nav>
 
-        {/* 3. Login / Logout Button (Right) */}
-        {/* I styled this to match the 'Nav' aesthetic (Glass/Zinc) instead of solid blue */}
         <div className="flex items-center gap-4">
            {isLoggedIn && (
              <div className="hidden md:flex items-center gap-2 text-zinc-500 text-[10px] tracking-widest uppercase">

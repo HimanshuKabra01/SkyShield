@@ -24,8 +24,6 @@ def get_db_connection():
             port="5432"
         )
 
-# --- 🧠 HELPER FUNCTIONS: PERSONALIZATION ENGINE ---
-
 def get_user_profile(user_id):
     """Fetches user health data. Opens its own connection to be safe."""
     conn = get_db_connection()
@@ -33,7 +31,6 @@ def get_user_profile(user_id):
     
     cur = conn.cursor()
     try:
-        # Ensure the table user_profiles exists (created in Step 1)
         cur.execute("""
             SELECT age_group, has_asthma, is_pregnant, sensitivity_score, display_name 
             FROM user_profiles WHERE user_id = %s
@@ -53,7 +50,6 @@ def get_user_profile(user_id):
             "sensitivity": row[3],
             "name": row[4]
         }
-    # Default Profile if not found
     return {"age": "adult", "asthma": False, "pregnant": False, "sensitivity": 1.0, "name": "Guest"}
 
 def calculate_risk_score(aqi, profile):
@@ -73,7 +69,6 @@ def calculate_risk_score(aqi, profile):
 def get_activity_advice(risk_score):
     activities = []
     
-    # 1. Sport
     if risk_score < 3.0:
         activities.append({"type": "sport", "name": "Running / Sport", "status": "GO", "color": "green", "message": "Perfect conditions! Go for that PB."})
     elif risk_score < 5.0:
@@ -81,7 +76,6 @@ def get_activity_advice(risk_score):
     else:
         activities.append({"type": "sport", "name": "Running / Sport", "status": "STOP", "color": "red", "message": "Lung stress high. Use treadmill."})
 
-    # 2. Commute
     if risk_score < 5.0:
         activities.append({"type": "commute", "name": "Walking / Commute", "status": "GO", "color": "green", "message": "Safe to walk outside."})
     elif risk_score < 7.0:
@@ -89,16 +83,12 @@ def get_activity_advice(risk_score):
     else:
         activities.append({"type": "commute", "name": "Walking / Commute", "status": "AVOID", "color": "red", "message": "Avoid all non-essential travel."})
 
-    # 3. Ventilation
     if risk_score < 4.0:
         activities.append({"type": "ventilation", "name": "Home Ventilation", "status": "OPEN", "color": "green", "message": "Open windows to let fresh air in."})
     else:
         activities.append({"type": "ventilation", "name": "Home Ventilation", "status": "CLOSE", "color": "red", "message": "Keep windows shut. Use purifier."})
         
     return activities
-
-
-# --- ROUTES ---
 
 @app.route('/api/stations', methods=['GET'])
 def get_stations():
@@ -176,13 +166,11 @@ def get_predictions(station_id):
         
     return jsonify(data)
 
-# --- NEW PERSONALIZATION ROUTES ---
-
 @app.route('/api/update_profile', methods=['POST'])
 def update_profile():
     """Updates user health settings (Asthma, Age, etc.)"""
     data = request.json
-    # Default to test ID if not provided, just for safety in dev
+
     user_id = data.get('user_id', 'test_firebase_uid_123') 
     
     conn = get_db_connection()
@@ -215,8 +203,7 @@ def get_personalized_feed():
     """Generates the Suitability Score and Advice Cards"""
     station_id = request.args.get('station_id')
     user_id = request.args.get('user_id', 'test_firebase_uid_123')
-    
-    # 1. Get User Profile
+
     profile = get_user_profile(user_id)
     if not profile:
         profile = {"age": "adult", "asthma": False, "pregnant": False, "sensitivity": 1.0, "name": "Guest"}
@@ -225,8 +212,6 @@ def get_personalized_feed():
     if not conn: return jsonify({"error": "DB failed"}), 500
     cur = conn.cursor()
 
-    # 2. Get Current Air Data (AQI & Timestamp)
-    # Using the same table 'measurements' as in get_stations
     cur.execute("""
         SELECT aqi, pm25, timestamp 
         FROM measurements 
@@ -243,7 +228,6 @@ def get_personalized_feed():
     risk_score = calculate_risk_score(current_aqi, profile)
     activities = get_activity_advice(risk_score)
     
-    # 3. Get Forecast (Next 12 hours) from 'predictions' table
     cur.execute("""
         SELECT forecast_timestamp, predicted_pm25 
         FROM predictions 
@@ -255,7 +239,6 @@ def get_personalized_feed():
     
     forecast_data = []
     for row in forecast_rows:
-        # Approximate AQI from PM2.5 for risk calc (Rough proxy: AQI ~ PM2.5 * 2)
         pred_val = row[1] if row[1] is not None else 0
         pred_aqi = pred_val * 2 
         pred_risk = calculate_risk_score(pred_aqi, profile)

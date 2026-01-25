@@ -67,7 +67,7 @@ def sync_stations():
             if lat and lon and lat != "NA" and lon != "NA":
                 new_stations.append((s_id, station_name, float(lat), float(lon), city))
 
-    print(f"📍 Found {len(new_stations)} stations in Delhi-NCR.")
+    print(f"Found {len(new_stations)} stations in Delhi-NCR.")
 
     if not new_stations:
         print(" No stations found. Check if the API Key is valid or Resource ID changed.")
