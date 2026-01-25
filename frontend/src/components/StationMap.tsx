@@ -13,10 +13,10 @@ interface Station {
   aqi: number
   no2_sat: number | string | null
   so2_sat: number | null
-  temp_c: number | null
-  wind_speed_10m: number | null
-  wind_speed_80m: number | null
-  pbl_height: number | null
+  temp_c: number | string | null
+  wind_speed_10m: number | string | null
+  wind_speed_80m: number | string | null
+  pbl_height: number | string | null
 }
 
 const MAP_CENTER: [number, number] = [28.6139, 77.209]
@@ -65,7 +65,6 @@ const StationMap: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([])
 
   useEffect(() => {
-    // Use the central API service
     api.get<Station[]>('/stations')
       .then(r => setStations(r.data))
       .catch(err => console.error("Failed to load map stations:", err))
@@ -83,6 +82,16 @@ const StationMap: React.FC = () => {
 
         {stations.map(s => {
           const g = getGlow(s.aqi)
+
+          // Helper to safely convert strings to numbers
+          const safeNumber = (val: any) => (val !== null && !isNaN(Number(val)) ? Number(val) : null);
+          
+          const pbl = safeNumber(s.pbl_height);
+          const pm25 = safeNumber(s.pm25);
+          const no2 = safeNumber(s.no2_sat);
+          const temp = safeNumber(s.temp_c);
+          const wind10 = safeNumber(s.wind_speed_10m);
+          const wind80 = safeNumber(s.wind_speed_80m);
 
           return (
             <React.Fragment key={s.station_id}>
@@ -120,27 +129,23 @@ const StationMap: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 mb-4">
-                      {/* PM2.5 Box with Crash Protection */}
+                      {/* PM2.5 Box */}
                       <div className="rounded-lg bg-white/5 px-3 py-2">
                         <p className="text-[9px] uppercase tracking-widest text-zinc-500">
                           PM2.5
                         </p>
                         <p className="text-xl font-light text-cyan-300">
-                          {s.pm25 !== null && !isNaN(Number(s.pm25)) 
-                            ? Number(s.pm25).toFixed(0) 
-                            : '--'}
+                          {pm25 !== null ? pm25.toFixed(0) : '--'}
                         </p>
                       </div>
 
-                      {/* NO2 Box with Crash Protection */}
+                      {/* NO2 Box */}
                       <div className="rounded-lg bg-white/5 px-3 py-2">
                         <p className="text-[9px] uppercase tracking-widest text-zinc-500">
                           NO₂
                         </p>
                         <p className="text-xl font-light text-purple-300">
-                          {s.no2_sat !== null && !isNaN(Number(s.no2_sat)) 
-                            ? Number(s.no2_sat).toFixed(1) 
-                            : '--'}
+                          {no2 !== null ? no2.toFixed(1) : '--'}
                         </p>
                       </div>
                     </div>
@@ -150,23 +155,24 @@ const StationMap: React.FC = () => {
                         <span className="flex items-center gap-2">
                           <Thermometer size={11} /> Temp
                         </span>
-                        <span>{s.temp_c}°C</span>
+                        <span>{temp !== null ? temp : '--'}°C</span>
                       </div>
 
                       <div className="flex justify-between text-[10px] text-zinc-400">
                         <span className="flex items-center gap-2">
                           <Wind size={11} /> Wind
                         </span>
-                        <span>{s.wind_speed_10m}/{s.wind_speed_80m} km/h</span>
+                        <span>{wind10 !== null ? wind10 : '--'}/{wind80 !== null ? wind80 : '--'} km/h</span>
                       </div>
                     </div>
 
-                    {s.pbl_height && s.pbl_height < 300 && (
+                    {/* PBL Height Warning (This was the error source) */}
+                    {pbl !== null && pbl < 300 && (
                       <div className="mt-3 rounded-lg bg-red-500/10 px-3 py-2">
                         <div className="flex items-center gap-2 text-red-400">
                           <AlertTriangle size={12} />
                           <p className="text-[9px] uppercase tracking-[0.25em]">
-                            Inversion · {s.pbl_height.toFixed(0)}m
+                            Inversion · {pbl.toFixed(0)}m
                           </p>
                         </div>
                       </div>
