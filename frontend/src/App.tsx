@@ -1,24 +1,32 @@
 import React, { useState, useEffect } from 'react';
+import { X } from 'lucide-react'; // Make sure to install lucide-react if missing
 import Header from './components/Header';
 import StationMap from './components/StationMap';
 import PredictivePanel from './components/PredictivePanel';
 import HotspotMap from './components/HotspotMap';
+import PersonalizedDashboard from './components/PersonalizedDashboard';
 import api from './services/api';
 
 interface Station {
   station_id: string;
   name: string;
   aqi: number;
-  likely_source?: string; // New Field
-  health_advice?: string; // New Field
+  likely_source?: string;
+  health_advice?: string;
 }
 
 const App: React.FC = () => {
+  // --- STATE ---
   const [activeTab, setActiveTab] = useState('holistic');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false); // Controls visibility of the modal
+  
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
 
+  // --- EFFECTS ---
   useEffect(() => {
+    // Initial Data Load
     api.get('/stations')
       .then(res => {
         setStations(res.data);
@@ -27,11 +35,64 @@ const App: React.FC = () => {
       .catch(err => console.error("Error loading stations:", err));
   }, []);
 
+  // Auto-show dashboard when logging in
+  useEffect(() => {
+    if (isLoggedIn) setShowDashboard(true);
+  }, [isLoggedIn]);
+
   return (
-    <div className="bg-zinc-950 h-screen overflow-hidden flex flex-col font-sans text-zinc-200">
-      <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+    <div className="bg-zinc-950 h-screen overflow-hidden flex flex-col font-sans text-zinc-200 selection:bg-blue-500/30">
+      
+      <Header 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isLoggedIn={isLoggedIn}
+        onLoginToggle={() => {
+          setIsLoggedIn(!isLoggedIn);
+          setShowDashboard(!isLoggedIn); // Toggle dashboard with login
+        }}
+      />
       
       <main className="flex-1 w-full relative overflow-hidden">
+        
+        {/* --- 🛡️ PERSONALIZED DASHBOARD OVERLAY --- */}
+        {/* This is the "Complete Page" view that sits on top of the map */}
+        {isLoggedIn && showDashboard && selectedStation && (
+          <div className="absolute inset-0 z-[1500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200">
+             
+             {/* Dashboard Container */}
+             <div className="relative w-full max-w-6xl max-h-full flex flex-col">
+                
+                {/* Close/Minimize Button */}
+                <div className="flex justify-end mb-4">
+                  <button 
+                    onClick={() => setShowDashboard(false)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm font-bold backdrop-blur transition-all"
+                  >
+                    <span>Minimize Dashboard</span>
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* The Actual Component */}
+                <PersonalizedDashboard stationId={selectedStation.station_id} />
+             </div>
+          </div>
+        )}
+        
+        {/* If logged in but dashboard minimized, show a floating trigger */}
+        {isLoggedIn && !showDashboard && (
+           <button 
+             onClick={() => setShowDashboard(true)}
+             className="absolute bottom-8 right-8 z-[1400] bg-blue-600 hover:bg-blue-500 text-white p-4 rounded-full shadow-2xl shadow-blue-900/50 transition-all hover:scale-110 flex items-center gap-2"
+           >
+             <span className="font-bold text-sm">Open My Dashboard</span>
+           </button>
+        )}
+
+
+        {/* --- TAB CONTENT --- */}
+
         {/* 1. HOLISTIC MAP */}
         {activeTab === 'holistic' && <StationMap />}
         
@@ -57,7 +118,6 @@ const App: React.FC = () => {
                   >
                     <div className="flex justify-between items-center">
                       <span>{s.name}</span>
-                      {/* Show Source Icon in List too! */}
                       {s.likely_source?.includes('Traffic') && <span className="opacity-50 text-[10px]">🚗</span>}
                       {s.likely_source?.includes('Industrial') && <span className="opacity-50 text-[10px]">🏭</span>}
                     </div>
