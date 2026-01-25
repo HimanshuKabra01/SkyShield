@@ -123,7 +123,7 @@ const StationMap: React.FC = () => {
                           PM2.5
                         </p>
                         <p className="text-xl font-light text-cyan-300">
-                          {s.pm25.toFixed(0)}
+                          {s.pm25?.toFixed(0) ?? '--'}
                         </p>
                       </div>
 
