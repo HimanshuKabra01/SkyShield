@@ -9,9 +9,9 @@ interface Station {
   name: string
   latitude: number
   longitude: number
-  pm25: number
+  pm25: number | string | null
   aqi: number
-  no2_sat: number | null
+  no2_sat: number | string | null
   so2_sat: number | null
   temp_c: number | null
   wind_speed_10m: number | null
@@ -65,8 +65,10 @@ const StationMap: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([])
 
   useEffect(() => {
+    // Use the central API service
     api.get<Station[]>('/stations')
       .then(r => setStations(r.data))
+      .catch(err => console.error("Failed to load map stations:", err))
   }, [])
 
   return (
@@ -118,21 +120,27 @@ const StationMap: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 mb-4">
+                      {/* PM2.5 Box with Crash Protection */}
                       <div className="rounded-lg bg-white/5 px-3 py-2">
                         <p className="text-[9px] uppercase tracking-widest text-zinc-500">
                           PM2.5
                         </p>
                         <p className="text-xl font-light text-cyan-300">
-                          {s.pm25?.toFixed(0) ?? '--'}
+                          {s.pm25 !== null && !isNaN(Number(s.pm25)) 
+                            ? Number(s.pm25).toFixed(0) 
+                            : '--'}
                         </p>
                       </div>
 
+                      {/* NO2 Box with Crash Protection */}
                       <div className="rounded-lg bg-white/5 px-3 py-2">
                         <p className="text-[9px] uppercase tracking-widest text-zinc-500">
                           NO₂
                         </p>
                         <p className="text-xl font-light text-purple-300">
-                          {s.no2_sat?.toFixed(1) ?? '--'}
+                          {s.no2_sat !== null && !isNaN(Number(s.no2_sat)) 
+                            ? Number(s.no2_sat).toFixed(1) 
+                            : '--'}
                         </p>
                       </div>
                     </div>
