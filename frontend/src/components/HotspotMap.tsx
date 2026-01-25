@@ -34,14 +34,14 @@ const PulsingHotspot = ({
   lon: number;
   aqi: number;
 }) => {
-  const radius = aqi > 300 ? 42 : aqi > 200 ? 32 : 22;
+  const radius = aqi > 300 ? 40 : aqi > 200 ? 30 : 22;
 
   return (
     <>
       {/* Outer Glow */}
       <CircleMarker
         center={[lat, lon]}
-        radius={radius * 1.6}
+        radius={radius * 1.7}
         pathOptions={{
           color: "transparent",
           fillColor: "#ef4444",
@@ -54,20 +54,18 @@ const PulsingHotspot = ({
         center={[lat, lon]}
         radius={radius}
         pathOptions={{
-          color: "#991b1b",
+          color: "#7f1d1d",
           weight: 1,
           fillColor: "#dc2626",
-          fillOpacity: 0.65,
+          fillOpacity: 0.7,
         }}
       >
         <Popup>
-          <div className="text-center">
-            <p className="text-xs uppercase tracking-widest text-red-500">
+          <div className="bg-zinc-900/70 backdrop-blur-2xl border border-white/10 rounded-md px-3 py-2 text-white text-xs shadow-xl">
+            <p className="uppercase tracking-widest text-red-400 text-[10px]">
               Hotspot
             </p>
-            <p className="text-lg font-bold text-zinc-900">
-              {aqi.toFixed(0)} AQI
-            </p>
+            <p className="text-lg font-semibold">{aqi.toFixed(0)} AQI</p>
           </div>
         </Popup>
       </CircleMarker>
@@ -75,7 +73,7 @@ const PulsingHotspot = ({
   );
 };
 
-/* ---------------- AUTO FIT BOUNDS ---------------- */
+/* ---------------- AUTO FIT ---------------- */
 
 const AutoBounds = ({ stations }: { stations: Station[] }) => {
   const map = useMap();
@@ -83,15 +81,11 @@ const AutoBounds = ({ stations }: { stations: Station[] }) => {
   useEffect(() => {
     if (!stations.length) return;
 
-    const bounds = stations
-      .filter(
-        (s) => !isNaN(s.latitude) && !isNaN(s.longitude)
-      )
-      .map((s) => [s.latitude, s.longitude] as [number, number]);
+    const bounds = stations.map(
+      (s) => [s.latitude, s.longitude] as [number, number]
+    );
 
-    if (bounds.length) {
-      map.fitBounds(bounds, { padding: [60, 60] });
-    }
+    map.fitBounds(bounds, { padding: [80, 80] });
   }, [stations, map]);
 
   return null;
@@ -104,50 +98,40 @@ const HotspotMap: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api
-      .get<any[]>("/stations")
-      .then((r) => {
-        const clean: Station[] = r.data
-          .map((s) => ({
-            ...s,
-            latitude: Number(s.latitude),
-            longitude: Number(s.longitude),
-            aqi: Number(s.aqi),
-            pm25: Number(s.pm25),
-            wind_speed_10m: Number(s.wind_speed_10m),
-            wind_dir: Number(s.wind_dir),
-          }))
-          .filter(
-            (s) =>
-              !isNaN(s.latitude) &&
-              !isNaN(s.longitude) &&
-              !isNaN(s.aqi) &&
-              s.aqi > 0
-          );
+    api.get<any[]>("/stations").then((r) => {
+      const clean = r.data
+        .map((s) => ({
+          ...s,
+          latitude: Number(s.latitude),
+          longitude: Number(s.longitude),
+          aqi: Number(s.aqi),
+        }))
+        .filter((s) => !isNaN(s.latitude) && !isNaN(s.longitude) && s.aqi > 0);
 
-        const sorted = [...clean].sort((a, b) => b.aqi - a.aqi);
-        const critical = sorted.filter((s) => s.aqi > 200);
-        const finalHotspots =
-          critical.length < 5 ? sorted.slice(0, 5) : critical;
+      const sorted = [...clean].sort((a, b) => b.aqi - a.aqi);
 
-        setHotspots(finalHotspots);
-        setLoading(false);
-      })
-      .catch((e) => console.error("Hotspot API Error:", e));
+      const severe = sorted.filter((s) => s.aqi > 200);
+      const remaining = sorted.filter((s) => s.aqi <= 200);
+
+      const finalHotspots = [...severe, ...remaining].slice(0, 5);
+
+      setHotspots(finalHotspots);
+      setLoading(false);
+    });
   }, []);
 
   return (
-    <div
-      className="relative w-full bg-zinc-950 flex"
-      style={{ height: "calc(100vh - var(--header-h, 72px))" }}
-    >
+    <div className="relative w-full h-screen bg-black overflow-hidden flex">
+
       {/* ---------------- MAP ---------------- */}
 
       <div className="flex-1 relative">
 
         {/* Vignette */}
-        <div className="pointer-events-none absolute inset-0 z-[500]
-        bg-[radial-gradient(circle_at_center,transparent_45%,rgba(0,0,0,0.75))]" />
+        <div
+          className="pointer-events-none absolute inset-0 z-[200]
+          bg-[radial-gradient(circle_at_center,transparent_45%,rgba(0,0,0,0.75))]"
+        />
 
         <MapContainer
           center={[28.6139, 77.209]}
@@ -157,7 +141,6 @@ const HotspotMap: React.FC = () => {
         >
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution="&copy; CARTO"
           />
 
           <AutoBounds stations={hotspots} />
@@ -171,38 +154,21 @@ const HotspotMap: React.FC = () => {
             />
           ))}
         </MapContainer>
-
-        {/* LEGEND */}
-        <div
-          className="absolute bottom-6 left-6 z-[1000]
-          bg-zinc-900/80 backdrop-blur-xl
-          border border-zinc-700
-          rounded-xl px-4 py-3 text-[11px] text-zinc-300 space-y-1"
-        >
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-500" />
-            Severe AQI (&gt;200)
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-orange-500" />
-            High AQI
-          </div>
-        </div>
       </div>
 
       {/* ---------------- SIDE PANEL ---------------- */}
 
       <div
-        className="absolute top-6 right-6 z-[1000] w-[22rem]
-        bg-gradient-to-br from-zinc-900/80 to-zinc-950/80
-        backdrop-blur-2xl
-        border border-red-500/20
-        rounded-3xl
-        shadow-[0_0_40px_-10px_rgba(239,68,68,0.4)]
-        overflow-hidden flex flex-col max-h-[80%]"
+        className="absolute right-5 top-20 bottom-5 z-[500]
+        w-[21rem]
+        bg-zinc-900/55 backdrop-blur-3xl
+        border border-white/10
+        rounded-xl
+        shadow-[0_30px_90px_rgba(0,0,0,0.9)]
+        flex flex-col overflow-hidden"
       >
         {/* Header */}
-        <div className="p-5 border-b border-red-500/20">
+        <div className="px-5 py-4 border-b border-white/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-red-400">
               <Flame size={18} className="animate-pulse" />
@@ -210,7 +176,6 @@ const HotspotMap: React.FC = () => {
                 Active Hotspots
               </h2>
             </div>
-            <span className="text-[10px] text-zinc-400">LIVE</span>
           </div>
 
           <p className="text-[11px] text-zinc-400 mt-2">
@@ -219,7 +184,7 @@ const HotspotMap: React.FC = () => {
         </div>
 
         {/* List */}
-        <div className="overflow-y-auto p-3 space-y-3">
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {loading ? (
             <div className="p-6 text-center text-xs text-zinc-500">
               Scanning satellite data...
@@ -228,22 +193,23 @@ const HotspotMap: React.FC = () => {
             hotspots.map((h, i) => (
               <div
                 key={h.station_id}
-                className="group relative overflow-hidden rounded-2xl
-                bg-zinc-950/60 border border-zinc-800
-                p-4 hover:border-red-500/50 hover:scale-[1.02]
+                className="rounded-lg
+                bg-zinc-950/60
+                border border-white/10
+                p-4 hover:border-red-500/40 hover:scale-[1.02]
                 transition-all duration-300"
               >
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100
-                transition bg-gradient-to-r from-red-500/10 via-transparent to-orange-500/10" />
-
-                <div className="relative z-10 flex justify-between">
+                <div className="flex justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="w-5 h-5 flex items-center justify-center
-                      rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold">
+                      <span
+                        className="w-5 h-5 flex items-center justify-center
+                        rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold"
+                      >
                         {i + 1}
                       </span>
-                      <h3 className="text-sm font-semibold text-zinc-200">
+
+                      <h3 className="text-sm font-medium text-zinc-200">
                         {h.name}
                       </h3>
                     </div>
@@ -255,7 +221,7 @@ const HotspotMap: React.FC = () => {
                   </div>
 
                   <div className="text-right">
-                    <div className="text-2xl font-black text-red-400 leading-none">
+                    <div className="text-2xl font-semibold text-red-400">
                       {h.aqi.toFixed(0)}
                     </div>
                     <div className="text-[10px] uppercase tracking-wider text-red-400/70">
@@ -264,7 +230,7 @@ const HotspotMap: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Severity bar */}
+                {/* Severity Bar */}
                 <div className="mt-3 h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-red-600 to-orange-500"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react'; // Make sure to install lucide-react if missing
+import { X, ChevronRight } from 'lucide-react'; 
 import Header from './components/Header';
 import StationMap from './components/StationMap';
 import PredictivePanel from './components/PredictivePanel';
@@ -19,7 +19,7 @@ const App: React.FC = () => {
   // --- STATE ---
   const [activeTab, setActiveTab] = useState('holistic');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showDashboard, setShowDashboard] = useState(false); // Controls visibility of the modal
+  const [showDashboard, setShowDashboard] = useState(false);
   
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
@@ -41,7 +41,7 @@ const App: React.FC = () => {
   }, [isLoggedIn]);
 
   return (
-    <div className="bg-zinc-950 h-screen overflow-hidden flex flex-col font-sans text-zinc-200 selection:bg-blue-500/30">
+    <div className="relative h-screen w-full overflow-hidden bg-zinc-950 text-zinc-200 font-sans selection:bg-indigo-500/30">
       
       <Header 
         activeTab={activeTab} 
@@ -49,77 +49,93 @@ const App: React.FC = () => {
         isLoggedIn={isLoggedIn}
         onLoginToggle={() => {
           setIsLoggedIn(!isLoggedIn);
-          setShowDashboard(!isLoggedIn); // Toggle dashboard with login
+          setShowDashboard(!isLoggedIn); 
         }}
       />
       
-      <main className="flex-1 w-full relative overflow-hidden">
+      <main className="relative h-full w-full">
         
         {/* --- 🛡️ PERSONALIZED DASHBOARD OVERLAY --- */}
-        {/* This is the "Complete Page" view that sits on top of the map */}
+        {/* FIX: Changed to 'fixed inset-0 z-[3000]' to appear ABOVE the header for a clean modal look */}
         {isLoggedIn && showDashboard && selectedStation && (
-          <div className="absolute inset-0 z-[1500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
              
+             {/* Backdrop */}
+             <div 
+               className="absolute inset-0 bg-black/60 backdrop-blur-md" 
+               onClick={() => setShowDashboard(false)} 
+             />
+
              {/* Dashboard Container */}
-             <div className="relative w-full max-w-6xl max-h-full flex flex-col">
+             <div className="relative w-full max-w-6xl max-h-full flex flex-col z-10 pointer-events-none">
                 
                 {/* Close/Minimize Button */}
-                <div className="flex justify-end mb-4">
+                <div className="flex justify-end mb-4 pointer-events-auto">
                   <button 
                     onClick={() => setShowDashboard(false)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm font-bold backdrop-blur transition-all"
+                    className="group flex items-center gap-2 px-5 py-2.5 rounded-full bg-zinc-900/50 hover:bg-zinc-800/80 text-zinc-300 hover:text-white text-xs font-bold tracking-wider uppercase border border-white/10 backdrop-blur-md transition-all shadow-lg"
                   >
-                    <span>Minimize Dashboard</span>
-                    <X size={16} />
+                    <span>Minimize</span>
+                    <X size={14} className="group-hover:rotate-90 transition-transform" />
                   </button>
                 </div>
 
-                {/* The Actual Component */}
-                <PersonalizedDashboard stationId={selectedStation.station_id} />
+                {/* The Actual Component (Enable pointer events) */}
+                <div className="pointer-events-auto overflow-hidden rounded-3xl shadow-2xl shadow-black/50">
+                   <PersonalizedDashboard stationId={selectedStation.station_id} />
+                </div>
              </div>
           </div>
         )}
         
-        {/* If logged in but dashboard minimized, show a floating trigger */}
+        {/* Floating Trigger (Visible when logged in but dashboard is minimized) */}
         {isLoggedIn && !showDashboard && (
            <button 
              onClick={() => setShowDashboard(true)}
-             className="absolute bottom-8 right-8 z-[1400] bg-blue-600 hover:bg-blue-500 text-white p-4 rounded-full shadow-2xl shadow-blue-900/50 transition-all hover:scale-110 flex items-center gap-2"
+             className="absolute bottom-8 right-8 z-[1400] group flex items-center gap-3 bg-zinc-900/80 hover:bg-zinc-800 text-white pl-5 pr-4 py-3 rounded-full shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-white/10 backdrop-blur-md transition-all hover:scale-105"
            >
-             <span className="font-bold text-sm">Open My Dashboard</span>
+             <span className="font-bold text-xs uppercase tracking-widest">My Dashboard</span>
+             <div className="bg-indigo-500 rounded-full p-1.5 group-hover:bg-indigo-400 transition-colors">
+               <ChevronRight size={14} />
+             </div>
            </button>
         )}
 
 
         {/* --- TAB CONTENT --- */}
 
-        {/* 1. HOLISTIC MAP */}
-        {activeTab === 'holistic' && <StationMap />}
+        {/* 1. HOLISTIC MAP (Fills container) */}
+        <div className={`absolute inset-0 transition-opacity duration-500 ${activeTab === 'holistic' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+           <StationMap />
+        </div>
         
         {/* 2. PREDICTIVE PANEL */}
         {activeTab === 'predictive' && (
-          <div className="h-full pt-20 px-6 pb-6 grid grid-cols-12 gap-6">
+          <div className="relative z-20 h-full w-full pt-24 px-6 pb-6 grid grid-cols-1 md:grid-cols-12 gap-6">
             
-            {/* Sidebar List */}
-            <div className="col-span-3 bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col">
-              <div className="p-4 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur">
-                <h2 className="text-xs font-black uppercase tracking-widest text-zinc-400">Select Station</h2>
+            {/* Sidebar List - Refined Glassy UI */}
+            <div className="col-span-1 md:col-span-3 h-full overflow-hidden rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md shadow-xl flex flex-col">
+              <div className="p-5 border-b border-white/5 bg-white/5">
+                <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Select Station</h2>
               </div>
-              <div className="overflow-y-auto flex-1 p-2 space-y-1">
+              
+              <div className="overflow-y-auto flex-1 p-3 space-y-2 custom-scrollbar">
                 {stations.map(s => (
                   <button 
                     key={s.station_id}
                     onClick={() => setSelectedStation(s)}
-                    className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all border group ${
+                    className={`group w-full text-left px-4 py-3 rounded-xl transition-all duration-300 border ${
                       selectedStation?.station_id === s.station_id 
-                      ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20' 
-                      : 'border-transparent text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
+                      ? 'bg-indigo-600/20 border-indigo-500/50 text-white shadow-[0_0_20px_rgba(79,70,229,0.2)]' 
+                      : 'border-transparent text-zinc-500 hover:bg-white/5 hover:text-zinc-200 hover:border-white/5'
                     }`}
                   >
                     <div className="flex justify-between items-center">
-                      <span>{s.name}</span>
-                      {s.likely_source?.includes('Traffic') && <span className="opacity-50 text-[10px]">🚗</span>}
-                      {s.likely_source?.includes('Industrial') && <span className="opacity-50 text-[10px]">🏭</span>}
+                      <span className="text-xs font-bold tracking-wide">{s.name}</span>
+                      <div className="flex gap-1">
+                        {s.likely_source?.includes('Traffic') && <span className="text-[10px] grayscale group-hover:grayscale-0 transition-all">🚗</span>}
+                        {s.likely_source?.includes('Industrial') && <span className="text-[10px] grayscale group-hover:grayscale-0 transition-all">🏭</span>}
+                      </div>
                     </div>
                   </button>
                 ))}
@@ -127,20 +143,23 @@ const App: React.FC = () => {
             </div>
             
             {/* Main Chart Area */}
-            <div className="col-span-9 h-full">
+            <div className="col-span-1 md:col-span-9 h-full min-h-0">
               {selectedStation ? (
                 <PredictivePanel stationId={selectedStation.station_id} stationName={selectedStation.name} />
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-zinc-700 border border-zinc-800 rounded-2xl bg-zinc-900/20">
-                  <p className="text-sm font-black uppercase tracking-widest">Select a station to initialize AI Model</p>
+                <div className="h-full flex flex-col items-center justify-center text-zinc-600 border border-white/5 rounded-2xl bg-zinc-900/20 backdrop-blur-sm">
+                  <p className="text-xs font-bold uppercase tracking-widest animate-pulse">Select a station to initialize AI Model</p>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* 3. HOTSPOT MAP */}
-        {activeTab === 'hotspots' && <HotspotMap />}
+        {/* 3. HOTSPOT MAP (Fills container) */}
+        <div className={`absolute inset-0 transition-opacity duration-500 ${activeTab === 'hotspots' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+           <HotspotMap />
+        </div>
+
       </main>
     </div>
   );

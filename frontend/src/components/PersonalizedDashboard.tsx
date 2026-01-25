@@ -1,252 +1,307 @@
-import React, { useEffect, useState } from 'react';
-import { Wind, Activity, AlertTriangle, Home, User, Settings } from 'lucide-react';
-import api from '../services/api';
+import React, { useEffect, useState } from 'react'
+import { Wind, Activity, AlertTriangle, Home, User, Settings } from 'lucide-react'
+import api from '../services/api'
 
-// --- Types ---
+/* ---------------- TYPES ---------------- */
+
 interface ForecastPoint {
-  time: string;
-  risk_score: number;
-  is_unsafe: boolean;
+  time: string
+  risk_score: number
+  is_unsafe: boolean
 }
 
 interface ActivityAdvice {
-  type: string;
-  name: string;
-  status: 'GO' | 'CAUTION' | 'STOP' | 'MASK' | 'AVOID' | 'OPEN' | 'CLOSE';
-  color: string;
-  message: string;
+  type: string
+  name: string
+  status: 'GO' | 'CAUTION' | 'STOP' | 'MASK' | 'AVOID' | 'OPEN' | 'CLOSE'
+  color: string
+  message: string
 }
 
 interface DashboardData {
   user_profile: {
-    age: string;
-    asthma: boolean;
-    pregnant: boolean;
-    sensitivity: number;
-    name: string;
-  };
+    age: string
+    asthma: boolean
+    pregnant: boolean
+    sensitivity: number
+    name: string
+  }
   current_context: {
-    aqi: number;
-    risk_score: number;
-    last_updated: string;
-  };
-  activities: ActivityAdvice[];
-  forecast: ForecastPoint[];
+    aqi: number
+    risk_score: number
+    last_updated: string
+  }
+  activities: ActivityAdvice[]
+  forecast: ForecastPoint[]
 }
 
 interface Props {
-  stationId: string;
+  stationId: string
 }
 
-const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
+/* ---------------- COMPONENT ---------------- */
 
-  // Local state for immediate UI updates while editing
+const PersonalizedDashboard: React.FC<Props> = ({ stationId }) => {
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+
   const [profile, setProfile] = useState({
     asthma: false,
     pregnant: false,
     age: 'adult'
-  });
+  })
 
   const fetchData = async () => {
     try {
-      setLoading(true);
-      const res = await api.get(`/personalized_feed?station_id=${stationId}&user_id=test_firebase_uid_123`);
-      setData(res.data);
+      setLoading(true)
+      const res = await api.get(
+        `/personalized_feed?station_id=${stationId}&user_id=test_firebase_uid_123`
+      )
+      setData(res.data)
       setProfile({
         asthma: res.data.user_profile.asthma,
         pregnant: res.data.user_profile.pregnant,
         age: res.data.user_profile.age
-      });
+      })
     } catch (err) {
-      console.error("Failed to load dashboard", err);
+      console.error("Failed to load dashboard", err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  // Sync profile changes to Backend
   const updateProfile = async (newProfile: any) => {
     try {
-      // 1. Optimistic UI update
-      setProfile(newProfile);
-      
-      // 2. Send to Backend
+      setProfile(newProfile)
       await api.post('/update_profile', {
         user_id: 'test_firebase_uid_123',
         has_asthma: newProfile.asthma,
         is_pregnant: newProfile.pregnant,
         age_group: newProfile.age
-      });
-
-      // 3. Reload Data to get new Risk Scores
-      fetchData();
+      })
+      fetchData()
     } catch (err) {
-      console.error("Failed to update profile", err);
+      console.error("Failed to update profile", err)
     }
-  };
+  }
 
   useEffect(() => {
-    if (stationId) fetchData();
-  }, [stationId]);
+    if (stationId) fetchData()
+  }, [stationId])
 
-  if (loading || !data) return <div className="p-8 text-center text-zinc-400 animate-pulse">Analyzing your risk profile...</div>;
+  if (loading || !data)
+    return (
+      <div className="p-10 text-center text-zinc-400 animate-pulse">
+        Initializing neural risk engine...
+      </div>
+    )
 
-  const { current_context, activities, forecast } = data;
-  const isHighRisk = current_context.risk_score > 5.0;
+  const { current_context, activities, forecast } = data
+  const isHighRisk = current_context.risk_score > 5
 
   return (
-    <div className="bg-zinc-900 text-zinc-100 rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 max-h-[80vh] overflow-y-auto custom-scrollbar">
-      
-      {/* --- HEADER: Risk Score --- */}
-      <div className={`p-8 relative overflow-hidden ${isHighRisk ? 'bg-red-900/20' : 'bg-emerald-900/20'}`}>
+
+    <div className="glass-panel text-white max-h-[80vh] overflow-y-auto">
+
+      {/* ================= HEADER ================= */}
+
+      <div className={`relative overflow-hidden p-8 ${
+        isHighRisk ? 'bg-red-500/10' : 'bg-emerald-500/10'
+      }`}>
+
         <div className="relative z-10 flex justify-between items-start">
+
           <div>
-            <h2 className="text-3xl font-black tracking-tighter text-white mb-2">
-              My Risk Score
+            <h2 className="text-3xl font-black tracking-tight">
+              PERSONAL RISK INDEX
             </h2>
-            <div className="flex items-center gap-2 text-zinc-400 text-sm font-medium">
-               <User size={14} />
-               {profile.age === 'adult' ? 'Adult' : profile.age === 'child' ? 'Child' : 'Elderly'} Profile
-               {profile.asthma && <span className="text-red-400">• Asthma Active</span>}
+
+            <div className="flex items-center gap-2 mt-2 text-xs text-zinc-400">
+              <User size={14} />
+              {profile.age.toUpperCase()} PROFILE
+              {profile.asthma && <span className="text-red-400">• ASTHMA</span>}
             </div>
           </div>
-          
+
           <div className="text-right">
-             <div className={`text-6xl font-black ${isHighRisk ? 'text-red-500' : 'text-emerald-400'}`}>
-               {current_context.risk_score}
-               <span className="text-lg text-zinc-500 font-bold">/10</span>
-             </div>
-             <p className="text-xs uppercase tracking-widest text-zinc-500 mt-1">Personal Exposure Index</p>
+            <div className={`text-6xl font-black ${
+              isHighRisk ? 'text-red-400' : 'text-emerald-400'
+            }`}>
+              {current_context.risk_score}
+              <span className="text-lg text-zinc-500">/10</span>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-zinc-400">
+              Exposure Score
+            </p>
           </div>
+
         </div>
 
-        {/* Background Ambient Glow */}
-        <div className={`absolute top-0 right-0 w-64 h-64 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 opacity-20 pointer-events-none
-          ${isHighRisk ? 'bg-red-600' : 'bg-emerald-600'}`} 
-        />
+        {/* Glow */}
+        <div className={`absolute -top-20 -right-20 w-72 h-72 rounded-full blur-3xl opacity-30
+          ${isHighRisk ? 'bg-red-500' : 'bg-emerald-500'}
+        `} />
+
       </div>
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* --- LEFT COL: Controls & Forecast (4 cols) --- */}
+      {/* ================= BODY ================= */}
+
+      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        {/* ---------- LEFT ---------- */}
+
         <div className="lg:col-span-4 space-y-6">
-          
-          {/* 1. Health Settings Card */}
-          <div className="bg-zinc-950/50 p-5 rounded-2xl border border-zinc-800">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-zinc-300 flex items-center gap-2">
-                <Settings size={16} /> Health Factors
+
+          {/* HEALTH FACTORS */}
+          <div className="glass-panel p-5">
+
+            <div className="flex justify-between mb-4">
+              <h3 className="flex items-center gap-2 text-zinc-300 font-semibold">
+                <Settings size={15} /> HEALTH FACTORS
               </h3>
-              <button 
-                onClick={() => setIsEditing(!isEditing)} 
-                className="text-xs text-blue-400 hover:text-blue-300 underline"
+
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="text-xs text-cyan-400 hover:text-cyan-300"
               >
-                {isEditing ? 'Done' : 'Edit'}
+                {isEditing ? 'DONE' : 'EDIT'}
               </button>
             </div>
-            
+
             <div className="space-y-3">
-              <label className="flex items-center justify-between p-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 transition cursor-pointer group">
-                <span className="text-sm font-medium text-zinc-400 group-hover:text-zinc-200">Asthma / Lung Condition</span>
-                <input 
-                  type="checkbox" 
-                  checked={profile.asthma}
-                  disabled={!isEditing}
-                  onChange={(e) => updateProfile({...profile, asthma: e.target.checked})}
-                  className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-500/50 disabled:opacity-50"
-                />
-              </label>
-              
-              <label className="flex items-center justify-between p-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 transition cursor-pointer group">
-                <span className="text-sm font-medium text-zinc-400 group-hover:text-zinc-200">Pregnancy</span>
-                <input 
-                  type="checkbox" 
-                  checked={profile.pregnant}
-                  disabled={!isEditing}
-                  onChange={(e) => updateProfile({...profile, pregnant: e.target.checked})}
-                  className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-500/50 disabled:opacity-50"
-                />
-              </label>
-            </div>
-          </div>
 
-          {/* 2. Mini Forecast Timeline */}
-          <div className="bg-zinc-950/50 p-5 rounded-2xl border border-zinc-800">
-             <h3 className="font-bold text-zinc-300 mb-4 flex items-center gap-2">
-               <Activity size={16} /> 12-Hour Forecast
-             </h3>
-             <div className="space-y-3">
-               {forecast.slice(0, 5).map((point, i) => (
-                 <div key={i} className="flex items-center gap-3 text-xs">
-                   <span className="w-10 text-zinc-500 font-mono">{point.time}</span>
-                   <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                     <div 
-                       className={`h-full rounded-full ${point.is_unsafe ? 'bg-red-500' : 'bg-emerald-500'}`} 
-                       style={{ width: `${Math.min(point.risk_score * 10, 100)}%` }}
-                     />
-                   </div>
-                   <span className={`w-6 text-right font-bold ${point.is_unsafe ? 'text-red-400' : 'text-emerald-400'}`}>
-                     {point.risk_score}
-                   </span>
-                 </div>
-               ))}
-             </div>
-          </div>
-
-        </div>
-
-        {/* --- RIGHT COL: Activity Advice (8 cols) --- */}
-        <div className="lg:col-span-8 grid gap-4">
-          {activities.map((activity, idx) => (
-            <div 
-              key={idx} 
-              className={`relative p-5 rounded-2xl border-l-4 bg-zinc-800/40 hover:bg-zinc-800/60 transition-colors border-zinc-700`}
-              style={{ borderLeftColor: activity.color }}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${
-                    activity.type === 'sport' ? 'bg-blue-500/20 text-blue-400' :
-                    activity.type === 'ventilation' ? 'bg-purple-500/20 text-purple-400' :
-                    'bg-orange-500/20 text-orange-400'
-                  }`}>
-                    {activity.type === 'sport' && <Activity size={18} />}
-                    {activity.type === 'commute' && <Wind size={18} />}
-                    {activity.type === 'ventilation' && <Home size={18} />}
-                  </div>
-                  <h4 className="font-bold text-lg text-zinc-200">{activity.name}</h4>
-                </div>
-                
-                <span 
-                  className="px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase"
-                  style={{ backgroundColor: activity.color, color: '#fff' }}
+              {[
+                { label: 'ASTHMA / LUNG CONDITION', key: 'asthma' },
+                { label: 'PREGNANCY', key: 'pregnant' }
+              ].map((item) => (
+                <label
+                  key={item.key}
+                  className="flex justify-between items-center
+                    bg-zinc-900/50 hover:bg-zinc-800/60
+                    rounded-lg px-4 py-3 transition"
                 >
-                  {activity.status}
-                </span>
-              </div>
-              
-              <p className="text-zinc-400 text-sm leading-relaxed ml-12">
-                {activity.message}
-              </p>
+                  <span className="text-xs text-zinc-300">
+                    {item.label}
+                  </span>
+
+                  <input
+                    type="checkbox"
+                    checked={(profile as any)[item.key]}
+                    disabled={!isEditing}
+                    onChange={(e) =>
+                      updateProfile({
+                        ...profile,
+                        [item.key]: e.target.checked
+                      })
+                    }
+                    className="w-4 h-4 accent-cyan-400"
+                  />
+                </label>
+              ))}
+
             </div>
-          ))}
-          
-          {/* Disclaimer */}
-          <div className="mt-4 p-4 rounded-xl bg-blue-900/10 border border-blue-900/30 flex gap-3 items-start">
-             <AlertTriangle size={16} className="text-blue-400 shrink-0 mt-0.5" />
-             <p className="text-[10px] text-blue-300/70 leading-normal">
-               This is an AI-generated health estimate based on ISRO satellite data and local sensors. 
-               Always consult a doctor for medical conditions.
-             </p>
+
+          </div>
+
+          {/* FORECAST */}
+          <div className="glass-panel p-5">
+
+            <h3 className="flex items-center gap-2 mb-4 text-zinc-300 font-semibold">
+              <Activity size={15} /> 12H RISK FORECAST
+            </h3>
+
+            <div className="space-y-3">
+              {forecast.slice(0, 5).map((p, i) => (
+                <div key={i} className="flex items-center gap-3 text-xs">
+
+                  <span className="w-10 text-zinc-500">{p.time}</span>
+
+                  <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${
+                        p.is_unsafe ? 'bg-red-500' : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${p.risk_score * 10}%` }}
+                    />
+                  </div>
+
+                  <span className={`w-6 text-right ${
+                    p.is_unsafe ? 'text-red-400' : 'text-emerald-400'
+                  }`}>
+                    {p.risk_score}
+                  </span>
+
+                </div>
+              ))}
+            </div>
+
           </div>
 
         </div>
-      </div>
-    </div>
-  );
-};
 
-export default PersonalizedDashboard;
+        {/* ---------- RIGHT ---------- */}
+
+        <div className="lg:col-span-8 grid gap-4">
+
+          {activities.map((a, i) => (
+
+            <div key={i} className="glass-panel p-5 hover:bg-white/5 transition">
+
+              <div className="flex justify-between mb-2">
+
+                <div className="flex items-center gap-3">
+
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{ backgroundColor: `${a.color}33`, color: a.color }}
+                  >
+                    {a.type === 'sport' && <Activity size={18} />}
+                    {a.type === 'commute' && <Wind size={18} />}
+                    {a.type === 'ventilation' && <Home size={18} />}
+                  </div>
+
+                  <h4 className="text-lg font-semibold text-zinc-200">
+                    {a.name}
+                  </h4>
+
+                </div>
+
+                <span
+                  className="px-3 py-1 rounded-full text-xs font-black"
+                  style={{ backgroundColor: a.color, color: '#000' }}
+                >
+                  {a.status}
+                </span>
+
+              </div>
+
+              <p className="text-sm text-zinc-400 leading-relaxed ml-12">
+                {a.message}
+              </p>
+
+            </div>
+
+          ))}
+
+          {/* DISCLAIMER */}
+          <div className="glass-panel p-4 flex gap-3 items-start">
+
+            <AlertTriangle size={16} className="text-blue-400 mt-0.5" />
+
+            <p className="text-[11px] text-blue-300">
+              AI-generated health guidance. Always consult a medical professional.
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  )
+}
+
+export default PersonalizedDashboard

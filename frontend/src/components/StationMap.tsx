@@ -2,15 +2,15 @@ import React, { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '../services/api'
-import { 
-  Thermometer, 
-  Wind, 
-  AlertTriangle, 
-  Factory, 
-  Car, 
-  Trees, 
-  Building2, 
-  Activity 
+import {
+  Thermometer,
+  Wind,
+  AlertTriangle,
+  Factory,
+  Car,
+  Trees,
+  Building2,
+  Activity
 } from 'lucide-react'
 
 interface Station {
@@ -26,21 +26,20 @@ interface Station {
   wind_speed_10m: number | string | null
   wind_speed_80m: number | string | null
   pbl_height: number | string | null
-  
-  // NEW FIELDS
   likely_source?: string
   health_advice?: string
 }
 
 const MAP_CENTER: [number, number] = [28.6139, 77.209]
 
-// Helper: Get Icon for Source
+/* ---------------- HELPERS ---------------- */
+
 const getSourceIcon = (source: string) => {
-  if (source?.includes('Traffic')) return <Car size={14} className="text-orange-400" />
-  if (source?.includes('Industrial')) return <Factory size={14} className="text-purple-400" />
-  if (source?.includes('Dust')) return <Wind size={14} className="text-yellow-400" />
-  if (source?.includes('Clean')) return <Trees size={14} className="text-green-400" />
-  return <Building2 size={14} className="text-blue-400" />
+  if (source?.includes('Traffic')) return <Car size={14} className="text-orange-300" />
+  if (source?.includes('Industrial')) return <Factory size={14} className="text-purple-300" />
+  if (source?.includes('Dust')) return <Wind size={14} className="text-yellow-300" />
+  if (source?.includes('Clean')) return <Trees size={14} className="text-emerald-300" />
+  return <Building2 size={14} className="text-sky-300" />
 }
 
 const getGlow = (aqi: number) => {
@@ -53,20 +52,30 @@ const getGlow = (aqi: number) => {
 }
 
 const getAQIStatus = (aqi: number) => {
-  if (aqi > 400) return { label: 'Severe', color: 'text-red-500' }
-  if (aqi > 300) return { label: 'Very Poor', color: 'text-red-700' }
-  if (aqi > 200) return { label: 'Poor', color: 'text-orange-500' }
-  if (aqi > 100) return { label: 'Moderate', color: 'text-yellow-500' }
+  if (aqi > 400) return { label: 'Severe', color: 'text-red-400' }
+  if (aqi > 300) return { label: 'Very Poor', color: 'text-red-500' }
+  if (aqi > 200) return { label: 'Poor', color: 'text-orange-400' }
+  if (aqi > 100) return { label: 'Moderate', color: 'text-yellow-400' }
   if (aqi > 50) return { label: 'Satisfactory', color: 'text-lime-400' }
-  return { label: 'Good', color: 'text-green-500' }
+  return { label: 'Good', color: 'text-emerald-400' }
 }
 
 const GlowMarker = ({ position, color, radius }: { position: [number, number], color: string, radius: number }) => (
   <>
-    <CircleMarker center={position} radius={radius * 2.6} pathOptions={{ color, fillColor: color, fillOpacity: 0.18, weight: 0 }} />
-    <CircleMarker center={position} radius={radius} pathOptions={{ color: '#ffffff', fillColor: color, fillOpacity: 0.95, weight: 2 }} />
+    <CircleMarker
+      center={position}
+      radius={radius * 2.6}
+      pathOptions={{ color, fillColor: color, fillOpacity: 0.18, weight: 0 }}
+    />
+    <CircleMarker
+      center={position}
+      radius={radius}
+      pathOptions={{ color: '#ffffff', fillColor: color, fillOpacity: 0.95, weight: 2 }}
+    />
   </>
 )
+
+/* ---------------- COMPONENT ---------------- */
 
 const StationMap: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([])
@@ -79,92 +88,127 @@ const StationMap: React.FC = () => {
 
   return (
     <div className="relative h-screen w-full bg-black overflow-hidden">
-      <MapContainer center={MAP_CENTER} zoom={11} zoomControl={false} className="h-full w-full">
+      <MapContainer
+        center={MAP_CENTER}
+        zoom={11}
+        zoomControl={false}
+        className="h-full w-full"
+      >
         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
 
         {stations.map(s => {
           const g = getGlow(s.aqi)
           const status = getAQIStatus(s.aqi)
-          const safeNumber = (val: any) => (val !== null && !isNaN(Number(val)) ? Number(val) : null);
-          
-          const pbl = safeNumber(s.pbl_height);
-          const pm25 = safeNumber(s.pm25);
-          const no2 = safeNumber(s.no2_sat);
-          const temp = safeNumber(s.temp_c);
-          const wind10 = safeNumber(s.wind_speed_10m);
+
+          const safeNumber = (v: any) =>
+            v !== null && !isNaN(Number(v)) ? Number(v) : null
+
+          const pbl = safeNumber(s.pbl_height)
+          const pm25 = safeNumber(s.pm25)
+          const no2 = safeNumber(s.no2_sat)
+          const temp = safeNumber(s.temp_c)
+          const wind10 = safeNumber(s.wind_speed_10m)
 
           return (
             <React.Fragment key={s.station_id}>
-              <GlowMarker position={[s.latitude, s.longitude]} color={g.color} radius={g.r} />
+              <GlowMarker
+                position={[s.latitude, s.longitude]}
+                color={g.color}
+                radius={g.r}
+              />
 
-              <CircleMarker center={[s.latitude, s.longitude]} radius={g.r} pathOptions={{ color: 'transparent', fillColor: 'transparent' }}>
+              <CircleMarker
+                center={[s.latitude, s.longitude]}
+                radius={g.r}
+                pathOptions={{ color: 'transparent', fillColor: 'transparent' }}
+              >
                 <Popup>
-                  <div className="w-[320px] rounded-2xl bg-zinc-950/95 backdrop-blur-xl p-4 text-white shadow-[0_0_80px_rgba(0,0,0,0.9)] ring-1 ring-white/10">
+
+                  {/* GLASS CARD */}
+                  <div className="
+                    w-[300px]
+                    rounded-lg
+                    bg-zinc-900/55
+                    backdrop-blur-3xl
+                    border border-white/15
+                    shadow-[inset_0_0_40px_rgba(255,255,255,0.05),0_25px_80px_rgba(0,0,0,0.9)]
+                    text-white
+                    p-3
+                  ">
 
                     {/* HEADER */}
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="text-[11px] uppercase tracking-[0.25em] text-zinc-400 font-bold">{s.name}</h3>
-                      <span className="text-[9px] text-zinc-500">REAL-TIME</span>
+                    <div className="flex justify-between mb-2">
+                      <h3 className="text-xs uppercase tracking-[0.3em] text-zinc-300 font-semibold">
+                        {s.name}
+                      </h3>
                     </div>
 
-                    {/* AQI DISPLAY */}
-                    <div className="mb-5 flex items-end justify-between border-b border-white/5 pb-4">
+                    {/* AQI */}
+                    <div className="flex justify-between items-end border-b border-white/10 pb-3 mb-3">
                       <div>
-                        <p className="text-5xl font-thin tracking-tighter text-white">{s.aqi}</p>
-                        <p className={`text-[10px] uppercase tracking-widest font-bold ${status.color} mt-1`}>{status.label}</p>
+                        <p className="text-4xl font-light">{s.aqi}</p>
+                        <p className={`text-xs uppercase tracking-widest mt-1 ${status.color}`}>
+                          {status.label}
+                        </p>
                       </div>
-                      
-                      {/* NEW: SOURCE ANALYSIS BADGE */}
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="flex items-center gap-2 bg-white/5 px-2 py-1 rounded-full border border-white/10">
-                          {getSourceIcon(s.likely_source || 'Unknown')}
-                          <span className="text-[9px] uppercase tracking-wider text-zinc-300">
-                            {s.likely_source || 'Analyzing...'}
-                          </span>
-                        </div>
+
+                      <div className="flex items-center gap-2 bg-zinc-800/70 px-2.5 py-1 rounded-full border border-white/10">
+                        {getSourceIcon(s.likely_source || '')}
+                        <span className="text-[10px] uppercase tracking-wider text-zinc-200">
+                          {s.likely_source || 'Analyzing'}
+                        </span>
                       </div>
                     </div>
 
-                    {/* NEW: HEALTH ADVICE BOX */}
-                    <div className={`mb-4 rounded-lg px-3 py-2.5 flex items-start gap-3 border ${
-                      s.aqi > 200 ? 'bg-red-500/10 border-red-500/20' : 'bg-emerald-500/10 border-emerald-500/20'
+                    {/* HEALTH */}
+                    <div className={`mb-3 rounded-md px-3 py-2 flex gap-3 border ${
+                      s.aqi > 200
+                        ? 'bg-red-500/10 border-red-500/30'
+                        : 'bg-emerald-500/10 border-emerald-500/30'
                     }`}>
-                      <Activity size={16} className={s.aqi > 200 ? 'text-red-400' : 'text-emerald-400'} />
-                      <p className="text-[10px] leading-relaxed text-zinc-300 font-medium">
-                        {s.health_advice || "No specific advice available."}
+                      <Activity size={16} />
+                      <p className="text-[11px] text-zinc-200 leading-relaxed">
+                        {s.health_advice || 'No specific advice available.'}
                       </p>
                     </div>
 
-                    {/* METRICS GRID */}
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                      <div className="rounded-lg bg-zinc-900/50 border border-white/5 px-3 py-2">
-                        <p className="text-[9px] uppercase tracking-widest text-zinc-500">PM2.5</p>
-                        <p className="text-lg font-light text-cyan-300">{pm25 ? pm25.toFixed(0) : '--'}</p>
+                    {/* METRICS */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="rounded-md bg-zinc-800/60 border border-white/10 px-2.5 py-2">
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-400">PM2.5</p>
+                        <p className="text-lg font-light text-cyan-300">
+                          {pm25 ? pm25.toFixed(0) : '--'}
+                        </p>
                       </div>
-                      <div className="rounded-lg bg-zinc-900/50 border border-white/5 px-3 py-2">
-                        <p className="text-[9px] uppercase tracking-widest text-zinc-500">NO₂</p>
-                        <p className="text-lg font-light text-purple-300">{no2 ? no2.toFixed(1) : '--'}</p>
+
+                      <div className="rounded-md bg-zinc-800/60 border border-white/10 px-2.5 py-2">
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-400">NO₂</p>
+                        <p className="text-lg font-light text-purple-300">
+                          {no2 ? no2.toFixed(1) : '--'}
+                        </p>
                       </div>
                     </div>
 
-                    {/* WEATHER ROW */}
-                    <div className="flex justify-between items-center rounded-lg bg-white/5 px-3 py-2 text-[10px] text-zinc-400">
+                    {/* WEATHER */}
+                    <div className="flex justify-between rounded-md bg-zinc-800/50 border border-white/10 px-2.5 py-2 text-[11px] text-zinc-300">
                       <div className="flex items-center gap-2">
-                        <Thermometer size={12} /> <span>{temp || '--'}°C</span>
+                        <Thermometer size={12} /> {temp || '--'}°C
                       </div>
                       <div className="flex items-center gap-2">
-                        <Wind size={12} /> <span>{wind10 || '--'} km/h</span>
+                        <Wind size={12} /> {wind10 || '--'} km/h
                       </div>
                     </div>
 
-                    {/* INVERSION WARNING */}
+                    {/* INVERSION */}
                     {pbl !== null && pbl < 300 && (
-                      <div className="mt-2 flex items-center justify-center gap-2 text-red-400 text-[9px] uppercase tracking-widest py-1">
-                        <AlertTriangle size={10} /> Inversion Layer Detected
+                      <div className="mt-3 flex justify-center gap-2 text-red-400 text-[10px] uppercase tracking-widest">
+                        <AlertTriangle size={12} />
+                        Inversion Layer Detected
                       </div>
                     )}
 
                   </div>
+
                 </Popup>
               </CircleMarker>
             </React.Fragment>
@@ -175,4 +219,4 @@ const StationMap: React.FC = () => {
   )
 }
 
-export default StationMap
+export default StationMap;
