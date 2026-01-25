@@ -8,7 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import axios from 'axios';
+import api from '../services/api';
 import { Zap, Clock } from 'lucide-react';
 
 interface Prediction {
@@ -26,8 +26,8 @@ const PredictivePanel = ({
   const [data, setData] = useState<Prediction[]>([]);
 
   useEffect(() => {
-    axios
-      .get<Prediction[]>(`http://127.0.0.1:5000/api/predictions/${stationId}`)
+    api
+      .get<Prediction[]>(`/predictions/${stationId}`)
       .then((res) => setData(res.data))
       .catch((err) => console.error('Forecast Error:', err));
   }, [stationId]);

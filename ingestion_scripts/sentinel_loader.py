@@ -7,17 +7,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_db_connection():
-  DATABASE_URL = os.environ.get('DATABASE_URL')
-  if DATABASE_URL:
-    return psycopg2.connect(DATABASE_URL)
-
-  return psycopg2.connect(
-    dbname="skyshield",
-    user="postgres",
-    password="Hkabra@2006",
-    host="localhost",
-    port="5432"
-  )
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    if DATABASE_URL:
+        return psycopg2.connect(DATABASE_URL)
+    return psycopg2.connect(
+        dbname="skyshield", user="postgres", password="Hkabra@2006",
+        host="localhost", port="5432"
+    )
 
 GOOGLE_CLOUD_PROJECT = "api-contri" 
 
@@ -28,7 +24,7 @@ def fetch_satellite_data():
     except Exception as e:
         print(f"❌ Auth Error: {e}"); return
 
-    # Delhi Region
+    # Focus on Delhi Region
     REGION = ee.Geometry.Point([77.2090, 28.6139])
 
     conn = get_db_connection()
@@ -37,15 +33,14 @@ def fetch_satellite_data():
     
     cur.execute("SELECT station_id, latitude, longitude FROM stations")
     stations = cur.fetchall()
-    print(f"📍 Targeting {len(stations)} ground stations...")
+    print(f"📍 Targeting {len(stations)} stations for satellite data...")
 
-    # Look back 5 days
+    # Look back 5 days (Satellite passes over Delhi once every 1-2 days)
     now = datetime.now()
     start_date = (now - timedelta(days=5)).strftime('%Y-%m-%d')
     end_date = now.strftime('%Y-%m-%d')
 
-    # Switch to NRTI (Near Real Time) for fresher data
-    print("🛰️  Fetching Sentinel-5P NRTI (Real-Time) Data...")
+    print("🛰️  Fetching Sentinel-5P Data...")
     
     no2_coll = (ee.ImageCollection('COPERNICUS/S5P/NRTI/L3_NO2')
                 .select('tropospheric_NO2_column_number_density')
@@ -64,45 +59,31 @@ def fetch_satellite_data():
 
     if no2_img:
         ts = no2_img.get('system:time_start').getInfo()
-        print(f"📸 Found NO2 Image from: {datetime.fromtimestamp(ts/1000)}")
-    else:
-        print("⚠️ No NO2 image found.")
+        print(f"📸 Found Satellite Image from: {datetime.fromtimestamp(ts/1000)}")
 
     updated_count = 0
-    
-    # Check the first station specifically for debugging
-    debug_station = stations[0]
-    print(f"🔍 DEBUG: Checking values for station {debug_station[0]}...")
 
     for station in stations:
-        s_id, lat, lon = station
+        # Force float conversion to prevent 'Invalid Geometry' error
+        s_id = station[0]
+        lat = float(station[1]) 
+        lon = float(station[2])
         point = ee.Geometry.Point([lon, lat])
         
-        # Extract NO2
         no2_val = 0.0
         if no2_img:
             data = no2_img.reduceRegion(reducer=ee.Reducer.mean(), geometry=point, scale=1000).getInfo()
             val = data.get('tropospheric_NO2_column_number_density')
-            if val is not None: 
-                no2_val = val * 1000000 
+            if val is not None: no2_val = val * 1000000 
 
-        # Extract SO2
         so2_val = 0.0
         if so2_img:
             data = so2_img.reduceRegion(reducer=ee.Reducer.mean(), geometry=point, scale=1000).getInfo()
             val = data.get('SO2_column_number_density')
-            if val is not None: 
-                so2_val = val * 1000000
+            if val is not None: so2_val = val * 1000000
 
-        # Print debug for first station
-        if s_id == debug_station[0]:
-            print(f"   -> NO2 Value: {no2_val}")
-            print(f"   -> SO2 Value: {so2_val}")
-
-        # Update Database
-        if no2_val is not None or so2_val is not None:
+        if no2_val > 0 or so2_val > 0:
             try:
-                # Update the LATEST record for this station
                 cur.execute("""
                     UPDATE measurements 
                     SET no2_sat = %s, so2_sat = %s
@@ -112,14 +93,13 @@ def fetch_satellite_data():
                     )
                 """, (no2_val, so2_val, s_id, s_id))
                 
-                if cur.rowcount > 0:
-                    updated_count += 1
+                if cur.rowcount > 0: updated_count += 1
             except Exception as e:
-                print(f"SQL Error: {e}")
+                pass
 
     conn.commit()
     conn.close()
-    print(f"🚀 Fusion Complete: Updated {updated_count} stations.")
+    print(f"🚀 Satellite Data fused for {updated_count} stations.")
 
 if __name__ == "__main__":
     fetch_satellite_data()

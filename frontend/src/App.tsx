@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import StationMap from './components/StationMap';
 import PredictivePanel from './components/PredictivePanel';
-import axios from 'axios';
+import api from './services/api';
 import { BarChart3 } from 'lucide-react';
 
 interface Station {
@@ -16,7 +16,7 @@ const App: React.FC = () => {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
 
   useEffect(() => {
-    axios.get('http://127.0.0.1:5000/api/stations')
+    api.get('/stations')
       .then(res => {
         setStations(res.data);
         if (res.data.length > 0) setSelectedStation(res.data[0]);

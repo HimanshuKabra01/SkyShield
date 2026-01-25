@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
-import axios from 'axios'
+import api from '../services/api'
 import { Thermometer, Wind, AlertTriangle } from 'lucide-react'
 
 interface Station {
@@ -65,7 +65,7 @@ const StationMap: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([])
 
   useEffect(() => {
-    axios.get<Station[]>('http://127.0.0.1:5000/api/stations')
+    api.get<Station[]>('/stations')
       .then(r => setStations(r.data))
   }, [])
 

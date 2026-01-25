@@ -8,33 +8,33 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_db_connection():
-  DATABASE_URL = os.environ.get('DATABASE_URL')
-  if DATABASE_URL:
-    return psycopg2.connect(DATABASE_URL)
-  
-  return psycopg2.connect(
-    dbname="skyshield",
-    user="postgres",
-    password="Hkabra@2006",
-    host="localhost",
-    port="5432"
-  )
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    if DATABASE_URL:
+        return psycopg2.connect(DATABASE_URL)
+    return psycopg2.connect(
+        dbname="skyshield", user="postgres", password="Hkabra@2006",
+        host="localhost", port="5432"
+    )
 
 def update_weather():
-    print("🌤️ Starting Holistic Weather Loader...")
+    print("🌤️ Starting Weather Loader...")
     
     conn = get_db_connection()
     if not conn: return
     cur = conn.cursor()
 
+    # Get only the stations we discovered in Delhi
     cur.execute("SELECT station_id, latitude, longitude FROM stations")
     stations = cur.fetchall()
-    print(f"📍 Found {len(stations)} stations. Syncing multi-layer atmospheric data...")
+    print(f"📍 Syncing weather for {len(stations)} stations...")
 
     count = 0
     
     for station in stations:
         s_id, lat, lon = station
+
+        # ⚠️ Crucial: 0.2s delay to respect API limits
+        time.sleep(0.2) 
 
         url = (
             f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
@@ -53,6 +53,7 @@ def update_weather():
                 wind_80m = data["current"]["wind_speed_80m"]
                 pbl_height = data["hourly"]["boundary_layer_height"][0] if "hourly" in data else None
 
+                # Update the existing record created by the CPCB loader
                 query = """
                     UPDATE measurements 
                     SET temp_c = %s, 
@@ -67,15 +68,13 @@ def update_weather():
                 """
                 cur.execute(query, (temp, wind_10m, wind_dir, wind_80m, pbl_height, s_id, s_id))
                 count += 1
-                  
+                
         except Exception as e:
-            print(f"⚠️ Error fetching weather for {s_id}: {e}")
-            
-        time.sleep(0.05)
+            print(f"⚠️ Weather Error {s_id}: {e}")
 
     conn.commit()
     conn.close()
-    print(f"✅ Success! Holistic weather updated for {count} stations.")
+    print(f"✅ Weather synced for {count} stations.")
 
 if __name__ == "__main__":
     update_weather()
