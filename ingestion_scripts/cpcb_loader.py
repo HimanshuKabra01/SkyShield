@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-RESOURCE_ID = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
-BASE_URL = f"https://api.data.gov.in/resource/{RESOURCE_ID}"
+# --- CONFIGURATION ---
+DATA_GOV_URL = "https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
+OPEN_METEO_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 
 def get_db_connection():
     DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -19,123 +20,117 @@ def get_db_connection():
         host="localhost", port="5432"
     )
 
-def generate_fallback_value(pollutant):
-    """Generates realistic Delhi data when sensors are offline"""
-    if pollutant == "pm25": return random.uniform(80, 250)
-    if pollutant == "pm10": return random.uniform(150, 400)
-    if pollutant == "no2": return random.uniform(40, 120)
-    if pollutant == "so2": return random.uniform(10, 40)
-    if pollutant == "co": return random.uniform(0.5, 3.0)
-    if pollutant == "o3": return random.uniform(20, 80)
-    return 0
-
-def fetch_hybrid_cpcb_data():
-    api_key = os.environ.get("DATA_GOV_API_KEY")
-    if not api_key:
-        print("❌ Error: DATA_GOV_API_KEY missing.")
-        return
-
-    print("🔌 Connecting to CPCB Feed (Hybrid Mode)...")
-    
-    # Fetch data
-    params = {
-        "api-key": api_key, "format": "json", "limit": "2000",
-        "filters[city]": "Delhi"
-    }
-
+def fetch_open_meteo_fallback(lat, lon):
+    """Fetches real-time estimated air quality if sensors are offline"""
     try:
-        response = requests.get(BASE_URL, params=params, timeout=30)
-        records = response.json().get("records", [])
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "current": "pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone",
+            "timezone": "auto"
+        }
+        response = requests.get(OPEN_METEO_URL, params=params, timeout=5)
+        data = response.json().get("current", {})
+        
+        return {
+            "pm10": data.get("pm10"),
+            "pm25": data.get("pm2_5"),
+            "no2": data.get("nitrogen_dioxide"),
+            "so2": data.get("sulphur_dioxide"),
+            "co": data.get("carbon_monoxide"),
+            "o3": data.get("ozone")
+        }
     except Exception as e:
-        print(f"❌ API Connection Failed: {e}")
-        return
+        print(f"⚠️ Open-Meteo Fallback failed for {lat}, {lon}: {e}")
+        return None
 
+def fetch_robust_data():
     conn = get_db_connection()
     if not conn: return
     cur = conn.cursor()
 
-    cur.execute("SELECT station_id, name FROM stations")
-    db_stations = {row[1].strip().lower(): row[0] for row in cur.fetchall()} 
+    cur.execute("SELECT station_id, name, latitude, longitude FROM stations")
+    stations = cur.fetchall()
+    
+    api_key = os.environ.get("DATA_GOV_API_KEY")
+    cpcb_data_map = {}
 
-    print(f"📥 Processing {len(records)} records...")
+    if api_key:
+        print("🔌 Attempting CPCB API Connection...")
+        try:
+            params = {"api-key": api_key, "format": "json", "limit": "2000", "filters[city]": "Delhi"}
+            response = requests.get(DATA_GOV_URL, params=params, timeout=10)
+            if response.status_code == 200:
+                records = response.json().get("records", [])
+                for rec in records:
+                    name = rec.get("station", "").strip().lower()
+                    pollutant = rec.get("pollutant_id")
+                    value = rec.get("pollutant_avg")
+                    
+                    if name not in cpcb_data_map: cpcb_data_map[name] = {}
+                    cpcb_data_map[name][pollutant] = value
+                print(f"✅ CPCB Data Received: {len(records)} records")
+            else:
+                print("⚠️ CPCB API Error (Non-200). Switching to Fallback.")
+        except Exception as e:
+            print(f"⚠️ CPCB API Failed: {e}")
 
     updates = 0
-    real_data_count = 0
-    fallback_count = 0
-    timestamp = datetime.now()
+    print(f"🔄 Syncing {len(stations)} stations...")
 
-    col_map = {
-        "PM2.5": "pm25", "PM 2.5": "pm25",
-        "PM10": "pm10", "PM 10": "pm10",
-        "NO2": "no2", "NH3": "no2",
-        "SO2": "so2", "CO": "co", "OZONE": "o3", "Ozone": "o3"
-    }
+    for s in stations:
+        s_id, name, lat, lon = s
+        
+        p_vals = {"pm25": None, "pm10": None, "no2": None, "so2": None, "co": None, "o3": None}
+        source = "None"
 
-    for rec in records:
-        api_station_name = rec.get("station", "").strip()
-        station_id = None
-        
-        # Fuzzy Match Station Name
-        if api_station_name.lower() in db_stations:
-            station_id = db_stations[api_station_name.lower()]
-        else:
-            for db_name, db_id in db_stations.items():
-                if db_name in api_station_name.lower() or api_station_name.lower() in db_name:
-                    station_id = db_id
-                    break
-        
-        if not station_id: continue 
+        station_key = name.strip().lower()
+        if station_key in cpcb_data_map:
+            raw = cpcb_data_map[station_key]
+            p_vals["pm25"] = raw.get("PM2.5") or raw.get("PM 2.5")
+            p_vals["pm10"] = raw.get("PM10") or raw.get("PM 10")
+            p_vals["no2"] = raw.get("NO2")
+            p_vals["so2"] = raw.get("SO2")
+            p_vals["co"] = raw.get("CO")
+            p_vals["o3"] = raw.get("OZONE")
+            source = "CPCB_Gov"
 
-        pollutant = rec.get("pollutant_id")
-        avg_val = rec.get("pollutant_avg")
-        db_col = col_map.get(pollutant)
-        
-        if not db_col: continue
+        if p_vals["pm25"] is None or str(p_vals["pm25"]) == "NA":
+            fallback = fetch_open_meteo_fallback(lat, lon)
+            if fallback:
+                p_vals = fallback
+                source = "Open-Meteo_Model"
 
-        # --- HYBRID LOGIC START ---
-        final_val = 0.0
-        
-        # 1. Try Real Data
-        if avg_val is not None and avg_val != "NA" and str(avg_val).lower() != "none":
+        def clean(val):
             try:
-                final_val = float(avg_val)
-                real_data_count += 1
+                return float(val) if val is not None and str(val) != "NA" else None
             except:
-                final_val = generate_fallback_value(db_col)
-                fallback_count += 1
-        else:
-            # 2. Use Fallback if Real is missing
-            final_val = generate_fallback_value(db_col)
-            fallback_count += 1
-        # --- HYBRID LOGIC END ---
+                return None
+
+        final_data = {k: clean(v) for k, v in p_vals.items()}
+
+        if all(v is None for v in final_data.values()):
+            continue
 
         try:
-            # Upsert
             cur.execute("""
-                SELECT id FROM measurements 
-                WHERE station_id = %s AND timestamp > NOW() - INTERVAL '30 minutes'
-            """, (station_id,))
-            existing = cur.fetchone()
-
-            if existing:
-                cur.execute(f"UPDATE measurements SET {db_col} = %s WHERE id = %s", (final_val, existing[0]))
-            else:
-                cur.execute(f"INSERT INTO measurements (station_id, timestamp, {db_col}) VALUES (%s, %s, %s)", 
-                            (station_id, timestamp, final_val))
-            
+                INSERT INTO measurements (station_id, timestamp, pm25, pm10, no2, so2, co, aqi)
+                VALUES (%s, NOW(), %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (station_id, timestamp) DO UPDATE
+                SET pm25 = EXCLUDED.pm25, pm10 = EXCLUDED.pm10, 
+                    no2 = EXCLUDED.no2, so2 = EXCLUDED.so2;
+            """, (
+                s_id, final_data["pm25"], final_data["pm10"], 
+                final_data["no2"], final_data["so2"], final_data["co"], 
+                final_data["pm25"]
+            ))
             updates += 1
-
         except Exception as e:
-            pass
+            print(f"Error updating {name}: {e}")
 
     conn.commit()
     conn.close()
-    
-    print("\n---------------- REPORT ----------------")
-    print(f"✅ Total Updates: {updates}")
-    print(f"📊 Real Values:   {real_data_count}")
-    print(f"🎲 Fallback Used: {fallback_count} (Sensors were offline)")
-    print("----------------------------------------")
+    print(f"✅ Sync Complete. Updated {updates} stations using mixed sources.")
 
 if __name__ == "__main__":
-    fetch_hybrid_cpcb_data()
+    fetch_robust_data()

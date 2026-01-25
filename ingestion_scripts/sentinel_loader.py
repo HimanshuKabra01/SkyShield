@@ -15,17 +15,16 @@ def get_db_connection():
         host="localhost", port="5432"
     )
 
-GOOGLE_CLOUD_PROJECT = "api-contri" 
+GOOGLE_CLOUD_PROJECT = "api-contri"  # Ensure this matches your GEE Project ID
 
 def fetch_satellite_data():
     try:
         print("🌍 Connecting to Google Earth Engine...")
         ee.Initialize(project=GOOGLE_CLOUD_PROJECT)
     except Exception as e:
-        print(f"❌ Auth Error: {e}"); return
-
-    # Focus on Delhi Region
-    REGION = ee.Geometry.Point([77.2090, 28.6139])
+        print(f"❌ Auth Error: {e}")
+        print("💡 Tip: Run 'earthengine authenticate' in terminal first.")
+        return
 
     conn = get_db_connection()
     if not conn: return
@@ -33,73 +32,58 @@ def fetch_satellite_data():
     
     cur.execute("SELECT station_id, latitude, longitude FROM stations")
     stations = cur.fetchall()
-    print(f"📍 Targeting {len(stations)} stations for satellite data...")
 
-    # Look back 5 days (Satellite passes over Delhi once every 1-2 days)
-    now = datetime.now()
-    start_date = (now - timedelta(days=5)).strftime('%Y-%m-%d')
-    end_date = now.strftime('%Y-%m-%d')
+    # Look back 7 days to ensure we find a cloud-free pass
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=7)
 
-    print("🛰️  Fetching Sentinel-5P Data...")
+    print("🛰️  Processing Sentinel-5P Mosaic (7-Day Aggregate)...")
     
-    no2_coll = (ee.ImageCollection('COPERNICUS/S5P/NRTI/L3_NO2')
+    # Create a cleaner cloud-free mosaic using the mean of the last week
+    no2_img = (ee.ImageCollection('COPERNICUS/S5P/NRTI/L3_NO2')
                 .select('tropospheric_NO2_column_number_density')
-                .filterDate(start_date, end_date)
-                .filterBounds(REGION)
-                .sort('system:time_start', False))
+                .filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
+                .mean()) # KEY FIX: Use Mean instead of First
 
-    so2_coll = (ee.ImageCollection('COPERNICUS/S5P/NRTI/L3_SO2')
+    so2_img = (ee.ImageCollection('COPERNICUS/S5P/NRTI/L3_SO2')
                 .select('SO2_column_number_density')
-                .filterDate(start_date, end_date)
-                .filterBounds(REGION)
-                .sort('system:time_start', False))
-
-    no2_img = no2_coll.first() if no2_coll.size().getInfo() > 0 else None
-    so2_img = so2_coll.first() if so2_coll.size().getInfo() > 0 else None
-
-    if no2_img:
-        ts = no2_img.get('system:time_start').getInfo()
-        print(f"📸 Found Satellite Image from: {datetime.fromtimestamp(ts/1000)}")
+                .filterDate(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
+                .mean())
 
     updated_count = 0
 
     for station in stations:
-        # Force float conversion to prevent 'Invalid Geometry' error
-        s_id = station[0]
-        lat = float(station[1]) 
-        lon = float(station[2])
-        point = ee.Geometry.Point([lon, lat])
+        s_id, lat, lon = station
+        
+        # KEY FIX: Use a buffer (radius) to find data even if the exact pixel is null
+        point = ee.Geometry.Point([float(lon), float(lat)]).buffer(2000) # 2km radius
         
         no2_val = 0.0
-        if no2_img:
-            data = no2_img.reduceRegion(reducer=ee.Reducer.mean(), geometry=point, scale=1000).getInfo()
+        try:
+            data = no2_img.reduceRegion(reducer=ee.Reducer.mean(), geometry=point, scale=1113).getInfo()
             val = data.get('tropospheric_NO2_column_number_density')
-            if val is not None: no2_val = val * 1000000 
+            if val: no2_val = val * 1000000 # Convert to µmol/m²
+        except: pass
 
         so2_val = 0.0
-        if so2_img:
-            data = so2_img.reduceRegion(reducer=ee.Reducer.mean(), geometry=point, scale=1000).getInfo()
+        try:
+            data = so2_img.reduceRegion(reducer=ee.Reducer.mean(), geometry=point, scale=1113).getInfo()
             val = data.get('SO2_column_number_density')
-            if val is not None: so2_val = val * 1000000
+            if val: so2_val = val * 1000000
+        except: pass
 
         if no2_val > 0 or so2_val > 0:
-            try:
-                cur.execute("""
-                    UPDATE measurements 
-                    SET no2_sat = %s, so2_sat = %s
-                    WHERE station_id = %s 
-                    AND timestamp = (
-                        SELECT MAX(timestamp) FROM measurements WHERE station_id = %s
-                    )
-                """, (no2_val, so2_val, s_id, s_id))
-                
-                if cur.rowcount > 0: updated_count += 1
-            except Exception as e:
-                pass
+            cur.execute("""
+                UPDATE measurements 
+                SET no2_sat = %s, so2_sat = %s
+                WHERE station_id = %s 
+                AND timestamp = (SELECT MAX(timestamp) FROM measurements WHERE station_id = %s)
+            """, (no2_val, so2_val, s_id, s_id))
+            updated_count += 1
 
     conn.commit()
     conn.close()
-    print(f"🚀 Satellite Data fused for {updated_count} stations.")
+    print(f"🚀 Satellite Data Fused for {updated_count} stations.")
 
 if __name__ == "__main__":
     fetch_satellite_data()
