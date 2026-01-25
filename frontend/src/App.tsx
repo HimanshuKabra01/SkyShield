@@ -4,7 +4,6 @@ import StationMap from './components/StationMap';
 import PredictivePanel from './components/PredictivePanel';
 import HotspotMap from './components/HotspotMap';
 import api from './services/api';
-import { BarChart3, Map as MapIcon, Zap } from 'lucide-react';
 
 interface Station {
   station_id: string;
