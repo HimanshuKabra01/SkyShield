@@ -1,15 +1,15 @@
 import requests
 import psycopg2
-import random
-from datetime import datetime
+import time
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # --- CONFIGURATION ---
-DATA_GOV_URL = "https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
-OPEN_METEO_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
+# Get your free token from: https://aqicn.org/data-platform/token/
+WAQI_TOKEN = os.environ.get("WAQI_API_TOKEN") 
+WAQI_URL_TEMPLATE = "https://api.waqi.info/feed/geo:{};{}/?token={}"
 
 def get_db_connection():
     DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -20,117 +20,84 @@ def get_db_connection():
         host="localhost", port="5432"
     )
 
-def fetch_open_meteo_fallback(lat, lon):
-    """Fetches real-time estimated air quality if sensors are offline"""
-    try:
-        params = {
-            "latitude": lat,
-            "longitude": lon,
-            "current": "pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone",
-            "timezone": "auto"
-        }
-        response = requests.get(OPEN_METEO_URL, params=params, timeout=5)
-        data = response.json().get("current", {})
-        
-        return {
-            "pm10": data.get("pm10"),
-            "pm25": data.get("pm2_5"),
-            "no2": data.get("nitrogen_dioxide"),
-            "so2": data.get("sulphur_dioxide"),
-            "co": data.get("carbon_monoxide"),
-            "o3": data.get("ozone")
-        }
-    except Exception as e:
-        print(f"⚠️ Open-Meteo Fallback failed for {lat}, {lon}: {e}")
-        return None
-
 def fetch_robust_data():
+    if not WAQI_TOKEN:
+        print("❌ Error: WAQI_API_TOKEN is missing in .env file.")
+        print("   Get one here: https://aqicn.org/data-platform/token/")
+        return
+
     conn = get_db_connection()
     if not conn: return
     cur = conn.cursor()
 
+    # Get all stations (ensure you have run station_syncer.py first)
     cur.execute("SELECT station_id, name, latitude, longitude FROM stations")
     stations = cur.fetchall()
     
-    api_key = os.environ.get("DATA_GOV_API_KEY")
-    cpcb_data_map = {}
-
-    if api_key:
-        print("🔌 Attempting CPCB API Connection...")
-        try:
-            params = {"api-key": api_key, "format": "json", "limit": "2000", "filters[city]": "Delhi"}
-            response = requests.get(DATA_GOV_URL, params=params, timeout=10)
-            if response.status_code == 200:
-                records = response.json().get("records", [])
-                for rec in records:
-                    name = rec.get("station", "").strip().lower()
-                    pollutant = rec.get("pollutant_id")
-                    value = rec.get("pollutant_avg")
-                    
-                    if name not in cpcb_data_map: cpcb_data_map[name] = {}
-                    cpcb_data_map[name][pollutant] = value
-                print(f"✅ CPCB Data Received: {len(records)} records")
-            else:
-                print("⚠️ CPCB API Error (Non-200). Switching to Fallback.")
-        except Exception as e:
-            print(f"⚠️ CPCB API Failed: {e}")
-
     updates = 0
-    print(f"🔄 Syncing {len(stations)} stations...")
+    print(f"🔄 Syncing Real-Time AQI for {len(stations)} stations via WAQI...")
 
     for s in stations:
         s_id, name, lat, lon = s
         
-        p_vals = {"pm25": None, "pm10": None, "no2": None, "so2": None, "co": None, "o3": None}
-        source = "None"
+        # Rate limiting: WAQI is generous, but let's be safe (approx 5-10 req/sec allowed)
+        # We add a tiny sleep to avoid overwhelming the connection pool or API
+        time.sleep(0.2) 
 
-        station_key = name.strip().lower()
-        if station_key in cpcb_data_map:
-            raw = cpcb_data_map[station_key]
-            p_vals["pm25"] = raw.get("PM2.5") or raw.get("PM 2.5")
-            p_vals["pm10"] = raw.get("PM10") or raw.get("PM 10")
-            p_vals["no2"] = raw.get("NO2")
-            p_vals["so2"] = raw.get("SO2")
-            p_vals["co"] = raw.get("CO")
-            p_vals["o3"] = raw.get("OZONE")
-            source = "CPCB_Gov"
-
-        if p_vals["pm25"] is None or str(p_vals["pm25"]) == "NA":
-            fallback = fetch_open_meteo_fallback(lat, lon)
-            if fallback:
-                p_vals = fallback
-                source = "Open-Meteo_Model"
-
-        def clean(val):
-            try:
-                return float(val) if val is not None and str(val) != "NA" else None
-            except:
-                return None
-
-        final_data = {k: clean(v) for k, v in p_vals.items()}
-
-        if all(v is None for v in final_data.values()):
-            continue
-
+        url = WAQI_URL_TEMPLATE.format(lat, lon, WAQI_TOKEN)
+        
         try:
+            response = requests.get(url, timeout=10)
+            data = response.json()
+            
+            if data.get("status") != "ok":
+                print(f"⚠️ API Error for {name}: {data.get('data')}")
+                continue
+
+            result = data.get("data", {})
+            iaqi = result.get("iaqi", {})
+            
+            # Extract Pollutants (WAQI uses distinct keys like 'pm25', 'pm10')
+            # Values are usually valid numbers, but we safeguard against missing keys
+            pm25 = iaqi.get("pm25", {}).get("v")
+            pm10 = iaqi.get("pm10", {}).get("v")
+            no2 = iaqi.get("no2", {}).get("v")
+            so2 = iaqi.get("so2", {}).get("v")
+            co = iaqi.get("co", {}).get("v")
+            o3 = iaqi.get("o3", {}).get("v")
+            
+            # Use the overall AQI reported by the station as a fallback if calc is complex
+            aqi = result.get("aqi")
+
+            # Skip if we have absolutely no particulate data (likely a station offline)
+            if pm25 is None and pm10 is None and aqi is None:
+                continue
+
+            # Insert into DB
             cur.execute("""
-                INSERT INTO measurements (station_id, timestamp, pm25, pm10, no2, so2, co, aqi)
-                VALUES (%s, NOW(), %s, %s, %s, %s, %s, %s)
+                INSERT INTO measurements (station_id, timestamp, pm25, pm10, no2, so2, co, o3, aqi)
+                VALUES (%s, NOW(), %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (station_id, timestamp) DO UPDATE
-                SET pm25 = EXCLUDED.pm25, pm10 = EXCLUDED.pm10, 
-                    no2 = EXCLUDED.no2, so2 = EXCLUDED.so2;
-            """, (
-                s_id, final_data["pm25"], final_data["pm10"], 
-                final_data["no2"], final_data["so2"], final_data["co"], 
-                final_data["pm25"]
-            ))
+                SET pm25 = EXCLUDED.pm25, 
+                    pm10 = EXCLUDED.pm10, 
+                    no2 = EXCLUDED.no2, 
+                    so2 = EXCLUDED.so2,
+                    co = EXCLUDED.co,
+                    o3 = EXCLUDED.o3,
+                    aqi = EXCLUDED.aqi;
+            """, (s_id, pm25, pm10, no2, so2, co, o3, aqi))
+            
             updates += 1
+            # Optional: Print progress for first few to verify
+            if updates % 5 == 0:
+                print(f"   -> Updated {name}: AQI {aqi} | PM2.5 {pm25}")
+
         except Exception as e:
-            print(f"Error updating {name}: {e}")
+            print(f"❌ Network/DB Error for {name}: {e}")
 
     conn.commit()
     conn.close()
-    print(f"✅ Sync Complete. Updated {updates} stations using mixed sources.")
+    print(f"✅ Sync Complete. Successfully updated {updates}/{len(stations)} stations with ground-truth data.")
 
 if __name__ == "__main__":
     fetch_robust_data()
