@@ -5,6 +5,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import psycopg2
 from datetime import datetime
+import random
 
 load_dotenv()
 
@@ -112,25 +113,40 @@ def get_activity_advice(risk_score):
 
 @app.route('/api/predict_disease', methods=['POST'])
 def predict_disease():
-    """
-    Analyzes symptoms and returns the likely disease with a confidence score.
-    """
     if not disease_model:
-        return jsonify({"error": "Model not active. Check server logs."}), 503
+        return jsonify({"error": "Model not active"}), 503
         
     data = request.json
     symptoms = data.get('symptoms', '')
+    
+    # In a real app, you would get lat/long from the frontend (navigator.geolocation)
+    # For now, we randomize it slightly around Delhi to simulate different users
+    user_lat = data.get('lat', 28.6139 + random.uniform(-0.02, 0.02))
+    user_lon = data.get('lon', 77.2090 + random.uniform(-0.02, 0.02))
     
     if not symptoms or len(symptoms) < 3:
         return jsonify({"error": "Please describe your symptoms in more detail."}), 400
         
     try:
-        # 1. Predict the disease
         prediction = disease_model.predict([symptoms])[0]
-        
-        # 2. Get confidence score (probability)
         probabilities = disease_model.predict_proba([symptoms])
         confidence = round(probabilities.max() * 100, 1)
+        
+        # --- SAVE TO DATABASE (CROWDSOURCING) ---
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    INSERT INTO disease_reports (disease, latitude, longitude, risk_level)
+                    VALUES (%s, %s, %s, %s)
+                """, (prediction, user_lat, user_lon, 'High' if confidence > 80 else 'Moderate'))
+                conn.commit()
+                print(f"📍 Saved report: {prediction} at {user_lat}, {user_lon}")
+            except Exception as db_err:
+                print(f"⚠️ Failed to save report: {db_err}")
+            finally:
+                conn.close()
         
         return jsonify({
             "disease": prediction,
@@ -308,6 +324,70 @@ def get_personalized_feed():
         },
         "activities": activities,
         "forecast": forecast_data
+    })
+
+@app.route('/api/disease_hotspots', methods=['GET'])
+def get_disease_hotspots():
+    """Returns the latest 100 disease reports for the heatmap"""
+    conn = get_db_connection()
+    if not conn: return jsonify({"error": "DB failed"}), 500
+    
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT disease, latitude, longitude, risk_level, timestamp 
+            FROM disease_reports 
+            ORDER BY timestamp DESC LIMIT 100
+        """)
+        rows = cur.fetchall()
+        
+        data = []
+        for r in rows:
+            data.append({
+                "disease": r[0],
+                "lat": r[1],
+                "lon": r[2],
+                "risk": r[3],
+                "date": r[4].strftime("%Y-%m-%d")
+            })
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/seasonal_forecast', methods=['GET'])
+def get_seasonal_forecast():
+    """Returns disease risks based on the current season/month"""
+    current_month = datetime.now().month
+    
+    # Simple Seasonal Logic (Northern Hemisphere)
+    if 11 <= current_month or current_month <= 2:
+        season = "Winter"
+        risks = ["Asthma", "Bronchitis", "Flu"]
+        advice = "Cold air and smog trap pollutants. High risk for respiratory issues."
+        color = "red"
+    elif 3 <= current_month <= 6:
+        season = "Summer"
+        risks = ["Heat Stroke", "Dehydration", "Skin Rashes"]
+        advice = "High temperatures and UV. Stay hydrated."
+        color = "orange"
+    elif 7 <= current_month <= 9:
+        season = "Monsoon"
+        risks = ["Dengue", "Malaria", "Typhoid"]
+        advice = "Stagnant water increases vector-borne diseases."
+        color = "purple"
+    else:
+        season = "Post-Monsoon"
+        risks = ["Allergies", "Viral Fever"]
+        advice = "Changing weather patterns may trigger allergies."
+        color = "yellow"
+
+    return jsonify({
+        "season": season,
+        "risks": risks,
+        "advice": advice,
+        "alert_color": color
     })
 
 if __name__ == '__main__':
