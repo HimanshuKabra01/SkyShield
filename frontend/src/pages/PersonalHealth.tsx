@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { 
   Wind, Activity, Home, User, Settings, Stethoscope, 
-  Send, ShieldCheck, ShieldAlert, ThermometerSun, 
-  Droplets, Zap, ChevronRight
+  ShieldAlert, ThermometerSun, Zap, ChevronRight
 } from 'lucide-react'
 import { 
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid 
