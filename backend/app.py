@@ -1,4 +1,5 @@
 import os
+import pickle
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -24,6 +25,21 @@ def get_db_connection():
             port="5432"
         )
 
+# ==========================================
+# DISEASE PREDICTION MODEL LOADER
+# ==========================================
+disease_model = None
+try:
+    with open('disease_model.pkl', 'rb') as f:
+        disease_model = pickle.load(f)
+    print("✅ Disease prediction model loaded.")
+except Exception as e:
+    print(f"⚠️ Warning: Could not load disease model. {e}")
+
+
+# ==========================================
+# HELPER FUNCTIONS
+# ==========================================
 def get_user_profile(user_id):
     """Fetches user health data. Opens its own connection to be safe."""
     conn = get_db_connection()
@@ -90,9 +106,43 @@ def get_activity_advice(risk_score):
         
     return activities
 
+# ==========================================
+# API ROUTES
+# ==========================================
+
+@app.route('/api/predict_disease', methods=['POST'])
+def predict_disease():
+    """
+    Analyzes symptoms and returns the likely disease with a confidence score.
+    """
+    if not disease_model:
+        return jsonify({"error": "Model not active. Check server logs."}), 503
+        
+    data = request.json
+    symptoms = data.get('symptoms', '')
+    
+    if not symptoms or len(symptoms) < 3:
+        return jsonify({"error": "Please describe your symptoms in more detail."}), 400
+        
+    try:
+        # 1. Predict the disease
+        prediction = disease_model.predict([symptoms])[0]
+        
+        # 2. Get confidence score (probability)
+        probabilities = disease_model.predict_proba([symptoms])
+        confidence = round(probabilities.max() * 100, 1)
+        
+        return jsonify({
+            "disease": prediction,
+            "confidence": confidence,
+            "advice": "Please consult a doctor for a confirmed diagnosis."
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/stations', methods=['GET'])
 def get_stations():
-    """Returns detailed station data including weather (Existing Logic)"""
+    """Returns detailed station data including weather"""
     conn = get_db_connection()
     if not conn:
         return jsonify({"error": "Database connection failed"}), 500
@@ -140,7 +190,7 @@ def get_stations():
 
 @app.route('/api/predictions/<station_id>', methods=['GET'])
 def get_predictions(station_id):
-    """Returns PM2.5 predictions for charts (Existing Logic)"""
+    """Returns PM2.5 predictions for charts"""
     conn = get_db_connection()
     if not conn:
         return jsonify({"error": "Database connection failed"}), 500
